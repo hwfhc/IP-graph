@@ -12,104 +12,53 @@
 
   var demo;
 
-  var lans = [];
+  var NODES = [];
+  var PACKETS = [];
 
-  function constructLan() {
-    for (var i = 0,maxTry = 0; i < 1 && maxTry < 200; i++,maxTry++) {
-      var lan = {
-        x: Math.random() * canvasEl.width,
-        y: Math.random() * canvasEl.height,
-        radius: 50
-      };
-      lan.nodes=[];
+  class Node{
+      constructor(){
+        this.x = Math.random() * canvasEl.width;
+        this.y = Math.random() * canvasEl.height;
 
-      if(isValid(lan)){
-        lans.push(lan);
-        constructNode(lan);
-        constructCable(lan);
-      }else{
-        i--;
+        this.radius = radiusOfNode;
+        this.neighbors = [];
       }
-    }
-
-    refreshRoutingTable();
-    demo = new constructPacket(lans[0].nodes[0],lans[0].nodes[1]);
-
-    function isValid(lan){
-      return lans.every(function(item, index, array){
-        if(Math.sqrt(Math.pow((item.x - lan.x), 2) + Math.pow((item.y - lan.y), 2)) > lan.radius + item.radius /*&&
-           lan.x - lan.radius > 0 &&
-           lan.x + lan.radius < canvasEl.width &&
-           lan.y - lan.radius > 0 &&
-           lan.y + lan.radius < canvasEl.height*/) return true;
-      });
-    }
-
   }
 
-  function constructNode(lan) {
-    for (var i = 0; i < 5; i++) {
-      var node = {
-        x: Math.random() * canvasEl.width,
-        y: Math.random() * canvasEl.height,
-        lan,
-        radius: radiusOfNode
-      };
-      node.cables = [];
+  class Packet{
+      constructor(origin,destination){
+        var distance = Math.sqrt(Math.pow((origin.x - destination.x), 2) + Math.pow((origin.y - destination.y), 2));
 
-      if(isValid(lan,node)){
-        if(lan.nodes[lan.nodes.length - 1]) node.cables.push(lan.nodes[lan.nodes.length - 1]);
-        lan.nodes.push(node);
-      }else{
-        i--;
+        this.origin = origin;
+        this.destination = destination;
+        this.sin = (destination.y - origin.y) / distance;
+        this.cos = (destination.x - origin.x) / distance;
+
+        this.x = origin.x;
+        this.y = origin.y;
+
+        PACKETS.push(this);
       }
-    }
 
-    function isValid(lan,node){
-      if(Math.sqrt(Math.pow((lan.x - node.x), 2) + Math.pow((lan.y - node.y), 2)) < lan.radius - paddingOfLan) return true;
-    }
-
-  }
-
-  function constructCable(edge) {
-    lans.forEach(function (lan){
-      lan.nodes.forEach(function (node1){
-        lan.nodes.forEach(function (node2){
-          if(Math.random() > 0.2){
-            return;
-          }
-          ctx.strokeStyle = edgeColor;
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(node1.x,node1.y);
-          ctx.lineTo(node2.x,node2.y);
-          ctx.stroke();
-        });
-      });
-    });
-  }
-
-  function constructPacket(origin,destination){
-    var distance = Math.sqrt(Math.pow((origin.x - destination.x), 2) + Math.pow((origin.y - destination.y), 2));
-
-    this.origin = origin;
-    this.destination = destination;
-    this.sin = (destination.y - origin.y) / distance;
-    this.cos = (destination.x - origin.x) / distance;
-
-    this.x = origin.x;
-    this.y = origin.y;
+      throw(){
+        var index = PACKETS.indexOf(this);
+        PACKETS.splice(index, 1);
+      }
   }
 
   function step(){
-    var distance = Math.sqrt(Math.pow((demo.x - demo.destination.x), 2) + Math.pow((demo.y - demo.destination.y), 2));
+    PACKETS.forEach(function(packet){
+      var origin = packet.origin;
+      var destination = packet.destination;
+      var distance = Math.sqrt(Math.pow((packet.x - destination.x), 2) + Math.pow((packet.y - destination.y), 2));
 
-    if(distance > radiusOfNode / 3){
-      demo.x += 0.3 * demo.cos;
-      demo.y += 0.3 * demo.sin;
-    }else{
-      demo = undefined;
-    }
+      if(distance > radiusOfNode / 3){
+        packet.x += 1 * packet.cos;
+        packet.y += 1 * packet.sin;
+      }else{
+        packet.throw();
+      }
+    });
 
     render();
 
@@ -117,12 +66,10 @@
   }
 
   function refreshRoutingTable(){
-    lans.forEach(function(lan){
-      lan.nodes.forEach(function(node){
-        node.cables.forEach(function(cable){
-          if(!isInArray(cable.cables,node)) cable.cables.push(node);
-        })
-      });
+    NODES.forEach(function(node){
+      node.neighbors.forEach(function(neighbor){
+        if(!isInArray(neighbor.neighbors,node)) neighbor.neighbors.push(node);
+      })
     });
 
     function isInArray(arr,value){
@@ -139,50 +86,51 @@
     ctx.fillStyle = backgroundColor;
     ctx.fillRect(0, 0, canvasEl.width, canvasEl.height);
 
-    lans.forEach(function (lan) {
-      ctx.strokeStyle  = lanBorderColor;
+    NODES.forEach(function (node) {
+      ctx.fillStyle  = nodeColor;
       ctx.beginPath();
-      ctx.arc(lan.x, lan.y, lan.radius, 0, 2 * Math.PI);
-      ctx.stroke();
+      ctx.arc(node.x, node.y, node.radius, 0, 2 * Math.PI);
+      ctx.fill();
 
-      lan.nodes.forEach(function (node) {
-        ctx.fillStyle  = nodeColor;
+      node.neighbors.forEach(function(objNode){
+        ctx.strokeStyle = edgeColor;
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.arc(node.x, node.y, node.radius, 0, 2 * Math.PI);
-        ctx.fill();
-
-        node.cables.forEach(function(objNode){
-          ctx.strokeStyle = edgeColor;
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(node.x,node.y);
-          ctx.lineTo(objNode.x,objNode.y);
-          ctx.stroke();
-        });
+        ctx.moveTo(node.x,node.y);
+        ctx.lineTo(objNode.x,objNode.y);
+        ctx.stroke();
       });
     });
 
-    if(demo){
+    PACKETS.forEach(function(packet){
       ctx.fillStyle  = packetColor;
       ctx.beginPath();
-      ctx.arc(demo.x, demo.y, 4, 0, 2 * Math.PI);
+      ctx.arc(packet.x, packet.y, 4, 0, 2 * Math.PI);
       ctx.fill();
-    }
+    });
   }
 
   window.onresize = function () {
     canvasEl.width = document.body.clientWidth;
     canvasEl.height = canvasEl.clientHeight;
 
-    lans = [];
 
-    constructLan();
+    for (var i = 0; i < 50; i++) {
+      var node = new Node();
+      if(NODES[i-1]) node.neighbors.push(NODES[i-1]);
+      NODES.push(node);
+    }
+
+    refreshRoutingTable();
     render();
+
+    demo = new Packet(NODES[0],NODES[1]);
+    demo = new Packet(NODES[39],NODES[40]);
   };
 
   window.onresize();
   window.requestAnimationFrame(step);
 
   console.log(demo);
-  console.log(lans);
+  console.log(NODES);
 }).call(this);
