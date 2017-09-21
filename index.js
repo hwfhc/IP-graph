@@ -5,28 +5,42 @@
   var backgroundColor = '#333';
   var nodeColor = '#fff';
   var edgeColor = '#fff';
-  var lanBorderColor = '#fff';
   var packetColor = '#16e5e3';
-  var paddingOfLan = 15;
   var radiusOfNode = 3;
-
-  var demo;
 
   var NODES = [];
   var PACKETS = [];
+  var LINES = [];
 
   class Node{
-      constructor(){
+      constructor(address){
         this.x = Math.random() * canvasEl.width;
         this.y = Math.random() * canvasEl.height;
-
         this.radius = radiusOfNode;
-        this.neighbors = [];
+
+        this.routingTable = [];
+        this.address = address;
+
+        if(NODES[address-1]){
+          this.routingTable.push(NODES[address-1]);
+          new Line(NODES[address-1],this);
+        }
+        NODES.push(this);
+      }
+
+      resolve(packet){
+        var index = PACKETS.indexOf(packet);
+        PACKETS.splice(index, 1);
+      }
+
+      send(destination){
+        new Packet(this,destination);
       }
   }
 
-  class Packet{
+  class Packet extends EventEmitter{
       constructor(origin,destination){
+        super();
         var distance = Math.sqrt(Math.pow((origin.x - destination.x), 2) + Math.pow((origin.y - destination.y), 2));
 
         this.origin = origin;
@@ -37,16 +51,34 @@
         this.x = origin.x;
         this.y = origin.y;
 
+        this.addListener('arrive',function arriveListener(){
+          this.removeListener('arrive',arriveListener);
+          destination.resolve(this);
+          destination.send(destination.routingTable[1]);
+        });
+
         PACKETS.push(this);
       }
 
-      throw(){
-        var index = PACKETS.indexOf(this);
-        PACKETS.splice(index, 1);
+      arrive(){
+        this.emitEvent('arrive');
       }
   }
 
-  function step(){
+  class Line{
+      constructor(origin,destination){
+        this.origin = origin;
+        this.destination = destination;
+
+        var check = LINES.every(function(line){
+          if(line.origin != origin && line.destination != destination) return true;
+        });
+
+        if(check) LINES.push(this);
+      }
+  }
+
+  function calculus(){
     PACKETS.forEach(function(packet){
       var origin = packet.origin;
       var destination = packet.destination;
@@ -56,19 +88,19 @@
         packet.x += 1 * packet.cos;
         packet.y += 1 * packet.sin;
       }else{
-        packet.throw();
+        packet.arrive();
       }
     });
 
     render();
 
-    window.requestAnimationFrame(step);
+    window.requestAnimationFrame(calculus);
   }
 
   function refreshRoutingTable(){
     NODES.forEach(function(node){
-      node.neighbors.forEach(function(neighbor){
-        if(!isInArray(neighbor.neighbors,node)) neighbor.neighbors.push(node);
+      node.routingTable.forEach(function(neighbor){
+        if(!isInArray(neighbor.routingTable,node)) neighbor.routingTable.push(node);
       })
     });
 
@@ -91,15 +123,15 @@
       ctx.beginPath();
       ctx.arc(node.x, node.y, node.radius, 0, 2 * Math.PI);
       ctx.fill();
+    });
 
-      node.neighbors.forEach(function(objNode){
-        ctx.strokeStyle = edgeColor;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(node.x,node.y);
-        ctx.lineTo(objNode.x,objNode.y);
-        ctx.stroke();
-      });
+    LINES.forEach(function(line){
+      ctx.strokeStyle = edgeColor;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(line.origin.x,line.origin.y);
+      ctx.lineTo(line.destination.x,line.destination.y);
+      ctx.stroke();
     });
 
     PACKETS.forEach(function(packet){
@@ -114,23 +146,22 @@
     canvasEl.width = document.body.clientWidth;
     canvasEl.height = canvasEl.clientHeight;
 
+    NODES = [];
+    LINES = [];
+    PACKETS = [];
 
     for (var i = 0; i < 50; i++) {
-      var node = new Node();
-      if(NODES[i-1]) node.neighbors.push(NODES[i-1]);
-      NODES.push(node);
+      new Node(i);
     }
 
     refreshRoutingTable();
     render();
-
-    demo = new Packet(NODES[0],NODES[1]);
-    demo = new Packet(NODES[39],NODES[40]);
   };
 
   window.onresize();
-  window.requestAnimationFrame(step);
+  window.requestAnimationFrame(calculus);
 
-  console.log(demo);
-  console.log(NODES);
+  NODES[5].send(NODES[6]);
+  NODES[3].send(NODES[4]);
+  NODES[15].send(NODES[16]);
 }).call(this);
