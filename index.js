@@ -10,22 +10,28 @@
 
   var NODES = [];
   var PACKETS = [];
-  var LINES = [];
+  var LINKS = [];
 
   class Node{
       constructor(address){
         this.x = Math.random() * canvasEl.width;
         this.y = Math.random() * canvasEl.height;
-        this.radius = radiusOfNode;
+        this.radius = address*3;
 
         this.routingTable = [];
+        this.links = [];
         this.address = address;
 
-        if(NODES[address-1]){
-          this.routingTable.push(NODES[address-1]);
-          new Line(NODES[address-1],this);
-        }
         NODES.push(this);
+      }
+
+      connect(node){
+        this.routingTable.push({
+          address: node.address,
+          linkID: this.links.length,
+          hops: 1
+        });
+        this.links.push(node);
       }
 
       resolve(packet){
@@ -33,8 +39,60 @@
         PACKETS.splice(index, 1);
       }
 
-      send(destination){
-        new Packet(this,destination);
+      send(linkID){
+        new Packet(this,this.links[linkID]);
+      }
+
+      sendAdvertisement(){
+        this.links.forEach((node) => {
+          node.getAdvertisement(this.routingTable,this);
+        });
+      }
+
+      getAdvertisement(newTable,link){
+        newTable.forEach((newItem,index) => {
+          var check = this.routingTable.every((item,index) => {
+            if(item.address !== newItem.address && this.address !== newItem.address) return true;
+          });
+
+          if(check){
+            var obj = {
+              address: newItem.address,
+              linkID: 0,
+              hops: 10000
+            }
+            this.routingTable.push(obj);
+          }
+        });
+
+        for(var i=0;i<this.routingTable.length;i++){
+          var obj = this.routingTable[i];
+          var links = this.links;
+          var item = getItem(this.routingTable[i].address,newTable);
+
+          if(item){
+            if(obj.hops > item.hops + 1){
+              obj.hops = item.hops + 1;
+              obj.linkID = getLinkID();
+            }
+          }
+        }
+
+
+        function getItem(index,arr){
+          for(var i=0;i<arr.length;i++){
+            if(arr[i].address == index) return arr[i];
+          }
+        }
+
+        function getLinkID(){
+          for(var i=0;i<links.length;i++){
+            if(link === links[i]){
+              return i;
+            };
+          }
+        }
+
       }
   }
 
@@ -54,7 +112,7 @@
         this.addListener('arrive',function arriveListener(){
           this.removeListener('arrive',arriveListener);
           destination.resolve(this);
-          destination.send(destination.routingTable[1]);
+          destination.send(1);
         });
 
         PACKETS.push(this);
@@ -65,16 +123,18 @@
       }
   }
 
-  class Line{
-      constructor(origin,destination){
+  class Link{
+      constructor(origin,destination,force){
         this.origin = origin;
         this.destination = destination;
+        this.low = origin.address;
+        this.high = destination.address;
 
-        var check = LINES.every(function(line){
-          if(line.origin != origin && line.destination != destination) return true;
-        });
-
-        if(check) LINES.push(this);
+        if(force || (this.high - this.low) > 1){
+          LINKS.push(this);
+          origin.connect(destination);
+          destination.connect(origin);
+        }
       }
   }
 
@@ -97,23 +157,6 @@
     window.requestAnimationFrame(calculus);
   }
 
-  function refreshRoutingTable(){
-    NODES.forEach(function(node){
-      node.routingTable.forEach(function(neighbor){
-        if(!isInArray(neighbor.routingTable,node)) neighbor.routingTable.push(node);
-      })
-    });
-
-    function isInArray(arr,value){
-        for(var i = 0; i < arr.length; i++){
-            if(value === arr[i]){
-                return true;
-            }
-        }
-        return false;
-    }
-  }
-
   function render() {
     ctx.fillStyle = backgroundColor;
     ctx.fillRect(0, 0, canvasEl.width, canvasEl.height);
@@ -125,12 +168,12 @@
       ctx.fill();
     });
 
-    LINES.forEach(function(line){
+    LINKS.forEach(function(link){
       ctx.strokeStyle = edgeColor;
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(line.origin.x,line.origin.y);
-      ctx.lineTo(line.destination.x,line.destination.y);
+      ctx.moveTo(link.origin.x,link.origin.y);
+      ctx.lineTo(link.destination.x,link.destination.y);
       ctx.stroke();
     });
 
@@ -147,21 +190,37 @@
     canvasEl.height = canvasEl.clientHeight;
 
     NODES = [];
-    LINES = [];
+    LINKS = [];
     PACKETS = [];
 
-    for (var i = 0; i < 50; i++) {
+    for (var i = 0; i < 10; i++) {
       new Node(i);
+
+      if(NODES[i-1]){
+        new Link(NODES[i-1],NODES[i],true);
+      }
     }
 
-    refreshRoutingTable();
+    NODES.forEach(function(node1){
+      NODES.forEach(function(node2){
+        if(Math.random() > 0.7) new Link(node1,node2);
+      });
+    });
+
     render();
   };
 
   window.onresize();
   window.requestAnimationFrame(calculus);
 
-  NODES[5].send(NODES[6]);
-  NODES[3].send(NODES[4]);
-  NODES[15].send(NODES[16]);
+  NODES.forEach(function(item){
+    item.sendAdvertisement();
+  });
+
+  NODES.forEach(function(item){
+    item.sendAdvertisement();
+  });
+
+  NODES[0].send(0);
+  console.log(NODES);
 }).call(this);
