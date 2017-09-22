@@ -39,8 +39,13 @@
         PACKETS.splice(index, 1);
       }
 
-      send(linkID){
-        new Packet(this,this.links[linkID]);
+      send(address){
+        var item;
+
+        for(var i=0;i<this.routingTable.length;i++){
+          if(this.routingTable[i].address === address) item = this.routingTable[i];
+        }
+        new Packet(this,this.links[item.linkID],address);
       }
 
       sendAdvertisement(){
@@ -97,7 +102,7 @@
   }
 
   class Packet extends EventEmitter{
-      constructor(origin,destination){
+      constructor(origin,destination,address){
         super();
         var distance = Math.sqrt(Math.pow((origin.x - destination.x), 2) + Math.pow((origin.y - destination.y), 2));
 
@@ -105,6 +110,7 @@
         this.destination = destination;
         this.sin = (destination.y - origin.y) / distance;
         this.cos = (destination.x - origin.x) / distance;
+        this.address = address;
 
         this.x = origin.x;
         this.y = origin.y;
@@ -112,7 +118,7 @@
         this.addListener('arrive',function arriveListener(){
           this.removeListener('arrive',arriveListener);
           destination.resolve(this);
-          destination.send(1);
+          if(destination.address != this.address) destination.send(this.address);
         });
 
         PACKETS.push(this);
@@ -193,7 +199,7 @@
     LINKS = [];
     PACKETS = [];
 
-    for (var i = 0; i < 10; i++) {
+    for (var i = 0; i < 5; i++) {
       new Node(i);
 
       if(NODES[i-1]){
@@ -221,6 +227,6 @@
     item.sendAdvertisement();
   });
 
-  NODES[0].send(0);
+  NODES[0].send(4);
   console.log(NODES);
 }).call(this);
