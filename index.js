@@ -9,7 +9,7 @@
   var packetSpeed = 6;
   var radiusOfNode = 3;
 
-  var numberOfNode = 5;
+  var numberOfNode = 60;
 var N=0;
   var NODES = [];
   var PACKETS = [];
@@ -72,14 +72,14 @@ var N=0;
       }
 
       sendAdvertisement(source,from){
-        this.color = "#fff"
+        //this.color = "#fff"
         this.links.forEach((node) => {
           if(node != from) node.getAdvertisement(this.routingTable,this,source);
         });
       }
 
       getAdvertisement(newTable,link,source){
-        this.color = "#fff";
+        ////this.color = "#fff";
 
         newTable.forEach((newItem,index) => {
           var check = this.routingTable.every((item,index) => {
@@ -213,7 +213,7 @@ var N=0;
 
     NODES.forEach(function (node) {
       ctx.fillStyle  = node.color;
-      ctx.fillText(node.address, node.x, node.y,30)
+    //  ctx.fillText(node.address, node.x, node.y,30)
       ctx.beginPath();
       ctx.arc(node.x, node.y, node.radius, 0, 2 * Math.PI);
       ctx.fill();
@@ -236,7 +236,7 @@ var N=0;
     });
   }
 
-  /*window.onresize = function () {
+  window.onresize = function () {
     canvasEl.width = document.body.clientWidth;
     canvasEl.height = canvasEl.clientHeight;
 
@@ -269,7 +269,7 @@ var N=0;
       NODES.forEach(function(node2){
         if(node1.graph != node2.graph){
           var distance = Math.sqrt(Math.pow((node1.x - node2.x), 2) + Math.pow((node1.y - node2.y), 2));
-          if(distance < 200){
+          if(distance < 250){
             new Link(node1,node2);
           }
         }
@@ -277,9 +277,9 @@ var N=0;
     });
 
     render();
-  };*/
+  };
 
-  window.onresize = function () {
+  /*window.onresize = function () {
     canvasEl.width = document.body.clientWidth;
     canvasEl.height = canvasEl.clientHeight;
 
@@ -304,7 +304,7 @@ var N=0;
     });
 
     render();
-  };
+  };*/
 
   window.onresize();
   window.requestAnimationFrame(calculus);
