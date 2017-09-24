@@ -9,8 +9,8 @@
   var packetSpeed = 6;
   var radiusOfNode = 3;
 
-  var numberOfNode = 80;
-
+  var numberOfNode = 5;
+var N=0;
   var NODES = [];
   var PACKETS = [];
   var LINKS = [];
@@ -20,6 +20,7 @@
         this.x = x;
         this.y = y;
         this.radius = radiusOfNode;
+        this.color = nodeColor;
 
         this.routingTable = [];
         this.links = [];
@@ -42,6 +43,7 @@
           this.graph = node.graph;
         }
         this.links.push(node);
+        this.sendAdvertisement(this.address);////////这里导致路由表超纲
       }
 
       resolve(packet){
@@ -69,23 +71,29 @@
         }
       }
 
-      sendAdvertisement(from){
+      sendAdvertisement(source,from){
+        this.color = "#fff"
         this.links.forEach((node) => {
-          node.getAdvertisement(this.routingTable,this);
+          if(node != from) node.getAdvertisement(this.routingTable,this,source);
         });
       }
 
-      getAdvertisement(newTable,link){
+      getAdvertisement(newTable,link,source){
+        this.color = "#fff";
+
         newTable.forEach((newItem,index) => {
           var check = this.routingTable.every((item,index) => {
-            if(item.address !== newItem.address && this.address !== newItem.address) return true;
+            if(item.address !== newItem.address){
+              return true;
+            }
           });
 
           if(check){
             var obj = {
               address: newItem.address,
-              linkID: 0,
-              hops: 10000
+              linkID: undefined,
+              hops: 10000,
+              source: source
             }
             this.routingTable.push(obj);
           }
@@ -97,13 +105,29 @@
           var item = getItem(this.routingTable[i].address,newTable);
 
           if(item){
-            if(obj.hops > item.hops + 1){
+            if(obj.hops > (item.hops + 1)){
               obj.hops = item.hops + 1;
               obj.linkID = getLinkID();
             }
           }
         }
 
+        var broadcost= ()=>{
+          var isSend;
+          for(var i=0;i<this.routingTable.length;i++){
+            if(this.routingTable[i].address === source){
+              for(var j=0;j<this.links.length;j++){
+                if(this.links[j] === link && this.routingTable[i].linkID === j) isSend = true;
+              }
+            }}
+
+
+          if(isSend){
+            this.sendAdvertisement(source,link);
+          }
+        }
+
+        broadcost();
 
         function getItem(index,arr){
           for(var i=0;i<arr.length;i++){
@@ -150,13 +174,13 @@
   }
 
   class Link{
-      constructor(origin,destination){
+      constructor(origin,destination,force){
         this.origin = origin;
         this.destination = destination;
         this.low = origin.address;
         this.high = destination.address;
 
-        if((this.high - this.low) > 1){
+        if((this.high - this.low) > 1 || force){
           LINKS.push(this);
           origin.connect(destination);
           destination.connect(origin);
@@ -188,7 +212,8 @@
     ctx.fillRect(0, 0, canvasEl.width, canvasEl.height);
 
     NODES.forEach(function (node) {
-      ctx.fillStyle  = nodeColor;
+      ctx.fillStyle  = node.color;
+      ctx.fillText(node.address, node.x, node.y,30)
       ctx.beginPath();
       ctx.arc(node.x, node.y, node.radius, 0, 2 * Math.PI);
       ctx.fill();
@@ -211,7 +236,7 @@
     });
   }
 
-  window.onresize = function () {
+  /*window.onresize = function () {
     canvasEl.width = document.body.clientWidth;
     canvasEl.height = canvasEl.clientHeight;
 
@@ -232,7 +257,6 @@
     }
 
     NODES.forEach(function(node1){
-      console.log(node1.address);
       NODES.forEach(function(node2){
         var distance = Math.sqrt(Math.pow((node1.x - node2.x), 2) + Math.pow((node1.y - node2.y), 2));
         if(distance < 150){
@@ -253,24 +277,42 @@
     });
 
     render();
+  };*/
+
+  window.onresize = function () {
+    canvasEl.width = document.body.clientWidth;
+    canvasEl.height = canvasEl.clientHeight;
+
+    NODES = [];
+    LINKS = [];
+    PACKETS = [];
+
+    for (var i = 0; i < numberOfNode; i++) {
+      var x = Math.random() * canvasEl.width;
+      var y = Math.random() * canvasEl.height;
+      new Node(x,y,i);
+
+      if(NODES[i-1]){
+        new Link(NODES[i-1],NODES[i],true);
+      }
+    }
+
+    NODES.forEach(function(node1){
+      NODES.forEach(function(node2){
+        if(Math.random() > 0.9) new Link(node1,node2);
+      });
+    });
+
+    render();
   };
 
   window.onresize();
   window.requestAnimationFrame(calculus);
 
-  NODES.forEach(function(item){
-    item.sendAdvertisement();
-  });
+/*  NODES.forEach(function(node){
+    node.sendAdvertisement(node.address);
+  });*/
 
-  NODES.forEach(function(item){
-    item.sendAdvertisement();
-  });
-
-  NODES.forEach(function(item){
-    item.sendAdvertisement();
-  });
-
-  console.log(NODES);
   setInterval(function(){
     var origin = parseInt(Math.random()*numberOfNode);
     var destination = parseInt(Math.random()*numberOfNode);
@@ -278,4 +320,6 @@
       NODES[origin].send(destination);
     }
   },250);
+  console.log(NODES);
+
 }).call(this);
