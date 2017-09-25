@@ -9,8 +9,8 @@
   var packetSpeed = 6;
   var radiusOfNode = 3;
 
-  var numberOfNode = 60;
-var N=0;
+  var numberOfNode = 50;
+
   var NODES = [];
   var PACKETS = [];
   var LINKS = [];
@@ -32,18 +32,34 @@ var N=0;
       }
 
       connect(node){
-        this.routingTable.push({
-          address: node.address,
-          linkID: this.links.length,
-          hops: 1
+        var index;
+        var check = this.routingTable.every((item,i) => {
+          if(item.address !== node.address){
+            return true;
+          }else{
+            index = i;
+            return false;
+          }
         });
+
+        if(check){
+          var obj = {
+            address: node.address,
+            linkID: this.links.length,
+            hops: 1,
+          }
+          this.routingTable.push(obj);
+        }else{
+          this.routingTable[index].linkID = this.links.length;
+          this.routingTable[index].hops = 1;
+        }
+
         if(this.graph < node.graph){
           node.graph = this.graph;
         }else{
           this.graph = node.graph;
         }
         this.links.push(node);
-        this.sendAdvertisement(this.address);////////这里导致路由表超纲
       }
 
       resolve(packet){
@@ -72,15 +88,12 @@ var N=0;
       }
 
       sendAdvertisement(source,from){
-        //this.color = "#fff"
         this.links.forEach((node) => {
           if(node != from) node.getAdvertisement(this.routingTable,this,source);
         });
       }
 
       getAdvertisement(newTable,link,source){
-        ////this.color = "#fff";
-
         newTable.forEach((newItem,index) => {
           var check = this.routingTable.every((item,index) => {
             if(item.address !== newItem.address){
@@ -93,7 +106,6 @@ var N=0;
               address: newItem.address,
               linkID: undefined,
               hops: 10000,
-              source: source
             }
             this.routingTable.push(obj);
           }
@@ -213,7 +225,6 @@ var N=0;
 
     NODES.forEach(function (node) {
       ctx.fillStyle  = node.color;
-    //  ctx.fillText(node.address, node.x, node.y,30)
       ctx.beginPath();
       ctx.arc(node.x, node.y, node.radius, 0, 2 * Math.PI);
       ctx.fill();
@@ -279,39 +290,13 @@ var N=0;
     render();
   };
 
-  /*window.onresize = function () {
-    canvasEl.width = document.body.clientWidth;
-    canvasEl.height = canvasEl.clientHeight;
-
-    NODES = [];
-    LINKS = [];
-    PACKETS = [];
-
-    for (var i = 0; i < numberOfNode; i++) {
-      var x = Math.random() * canvasEl.width;
-      var y = Math.random() * canvasEl.height;
-      new Node(x,y,i);
-
-      if(NODES[i-1]){
-        new Link(NODES[i-1],NODES[i],true);
-      }
-    }
-
-    NODES.forEach(function(node1){
-      NODES.forEach(function(node2){
-        if(Math.random() > 0.9) new Link(node1,node2);
-      });
-    });
-
-    render();
-  };*/
-
   window.onresize();
   window.requestAnimationFrame(calculus);
+  render();
 
-/*  NODES.forEach(function(node){
+  NODES.forEach(function(node){
     node.sendAdvertisement(node.address);
-  });*/
+  });
 
   setInterval(function(){
     var origin = parseInt(Math.random()*numberOfNode);
