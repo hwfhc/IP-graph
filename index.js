@@ -33,7 +33,7 @@
 
       connect(node){
         var index;
-        var check = this.routingTable.every((item,i) => {
+        var notDuplicate = this.routingTable.every((item,i) => {
           if(item.address !== node.address){
             return true;
           }else{
@@ -42,13 +42,13 @@
           }
         });
 
-        if(check){
-          var obj = {
+        if(notDuplicate){
+          var newItem = {
             address: node.address,
             linkID: this.links.length,
             hops: 1,
           }
-          this.routingTable.push(obj);
+          this.routingTable.push(newItem);
         }else{
           this.routingTable[index].linkID = this.links.length;
           this.routingTable[index].hops = 1;
@@ -62,9 +62,10 @@
         this.links.push(node);
       }
 
-      resolve(packet){
+      receive(packet){
         var index = PACKETS.indexOf(packet);
         PACKETS.splice(index, 1);
+        if(this.address !== packet.address) this.send(packet.address);
       }
 
       send(address){
@@ -78,11 +79,11 @@
 
 
         function getLinkID(){
-          var item = this.routingTable.filter((item)=>{
+          var link = this.routingTable.filter((item)=>{
             if(item.address === address) return true;
           })[0];
 
-          if(item) return item.linkID;
+          if(link) return link.linkID;
           return undefined;
         }
       }
@@ -93,67 +94,73 @@
         });
       }
 
-      getAdvertisement(newTable,link,source){
-        newTable.forEach((newItem,index) => {
-          var check = this.routingTable.every((item,index) => {
-            if(item.address !== newItem.address){
-              return true;
+      getAdvertisement(newTable,from,source){
+        addNewItemToRoutingTable.call(this);
+        updateItemInformationInRoutingTable.call(this);
+        broadcost.call(this);
+
+        function addNewItemToRoutingTable(){
+          newTable.forEach((newItem,index) => {
+            var isNotHaveItem = this.routingTable.every((item,index) => {
+              if(item.address !== newItem.address) return true;
+            });
+
+            if(isNotHaveItem){
+              var obj = {
+                address: newItem.address,
+                linkID: undefined,
+                hops: 10000,
+              }
+              this.routingTable.push(obj);
             }
           });
 
-          if(check){
-            var obj = {
-              address: newItem.address,
-              linkID: undefined,
-              hops: 10000,
-            }
-            this.routingTable.push(obj);
-          }
-        });
-
-        for(var i=0;i<this.routingTable.length;i++){
-          var obj = this.routingTable[i];
-          var links = this.links;
-          var item = getItem(this.routingTable[i].address,newTable);
-
-          if(item){
-            if(obj.hops > (item.hops + 1)){
-              obj.hops = item.hops + 1;
-              obj.linkID = getLinkID();
-            }
-          }
         }
 
-        var broadcost= ()=>{
+        function updateItemInformationInRoutingTable(){
+          var links = this.links;
+
+          this.routingTable.forEach((item,index) => {
+            var newItem = getItemWithAddress(this.routingTable[index].address,newTable);
+
+            if(newItem && item.hops > (newItem.hops + 1)){
+              item.hops = newItem.hops + 1;
+              item.linkID = getLinkIdOfFrom();
+            }
+          });
+
+
+          function getItemWithAddress(address,table){
+            for(var i=0;i<table.length;i++){
+              if(table[i].address == address) return table[i];
+            }
+          }
+
+          function getLinkIdOfFrom(){
+            for(var i=0;i<links.length;i++){
+              if(from === links[i]){
+                return i;
+              };
+            }
+          }
+
+        }
+
+        function broadcost(){
           var isSend;
           for(var i=0;i<this.routingTable.length;i++){
             if(this.routingTable[i].address === source){
               for(var j=0;j<this.links.length;j++){
-                if(this.links[j] === link && this.routingTable[i].linkID === j) isSend = true;
+                if(this.links[j] === from && this.routingTable[i].linkID === j) isSend = true;
               }
             }}
 
 
           if(isSend){
-            this.sendAdvertisement(source,link);
+            this.sendAdvertisement(source,from);
           }
         }
 
-        broadcost();
-
-        function getItem(index,arr){
-          for(var i=0;i<arr.length;i++){
-            if(arr[i].address == index) return arr[i];
-          }
-        }
-
-        function getLinkID(){
-          for(var i=0;i<links.length;i++){
-            if(link === links[i]){
-              return i;
-            };
-          }
-        }
       }
   }
 
@@ -173,8 +180,7 @@
 
         this.addListener('arrive',function arriveListener(){
           this.removeListener('arrive',arriveListener);
-          destination.resolve(this);
-          if(destination.address !== this.address) destination.send(this.address);
+          destination.receive(this);
         });
 
         PACKETS.push(this);
@@ -183,16 +189,28 @@
       arrive(){
         this.emitEvent('arrive');
       }
+
+      move(){
+        var distance = Math.sqrt(Math.pow((this.x - this.destination.x), 2) + Math.pow((this.y - this.destination.y), 2));
+
+        if(distance > radiusOfNode){
+          this.x += packetSpeed * this.cos;
+          this.y += packetSpeed * this.sin;
+        }else{
+          this.arrive();
+        }
+      }
+
   }
 
   class Link{
-      constructor(origin,destination,force){
+      constructor(origin,destination){
         this.origin = origin;
         this.destination = destination;
         this.low = origin.address;
         this.high = destination.address;
 
-        if((this.high - this.low) > 1 || force){
+        if((this.high - this.low) > 1){
           LINKS.push(this);
           origin.connect(destination);
           destination.connect(origin);
@@ -202,16 +220,7 @@
 
   function calculus(){
     PACKETS.forEach(function(packet){
-      var origin = packet.origin;
-      var destination = packet.destination;
-      var distance = Math.sqrt(Math.pow((packet.x - destination.x), 2) + Math.pow((packet.y - destination.y), 2));
-
-      if(distance > radiusOfNode){
-        packet.x += packetSpeed * packet.cos;
-        packet.y += packetSpeed * packet.sin;
-      }else{
-        packet.arrive();
-      }
+      packet.move();
     });
 
     render();
@@ -287,16 +296,14 @@
       });
     });
 
+    NODES.forEach(function(node){
+      node.sendAdvertisement(node.address);
+    });
     render();
   };
 
   window.onresize();
   window.requestAnimationFrame(calculus);
-  render();
-
-  NODES.forEach(function(node){
-    node.sendAdvertisement(node.address);
-  });
 
   setInterval(function(){
     var origin = parseInt(Math.random()*numberOfNode);
@@ -307,4 +314,4 @@
   },250);
   console.log(NODES);
 
-}).call(this);
+})();
