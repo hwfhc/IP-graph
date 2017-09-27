@@ -11,6 +11,15 @@
 
   var numberOfNode = 50;
 
+  var locationRuleOfNode = function(x,y){
+    if((x < canvasEl.width/2-200 || x > canvasEl.width/2+200) ||
+       (y < canvasEl.height/2-200 || y > canvasEl.height/2+200)){
+         return true;
+       }else{
+         return false
+       }
+  }
+
   var NODES = [];
   var PACKETS = [];
   var LINKS = [];
@@ -268,12 +277,11 @@
       var x = Math.random() * canvasEl.width;
       var y = Math.random() * canvasEl.height;
 
-      if((x < canvasEl.width/2-200 || x > canvasEl.width/2+200) ||
-         (y < canvasEl.height/2-200 || y > canvasEl.height/2+200)){
-           new Node(x,y,i);
-         }else{
-           i--;
-         }
+      if(locationRuleOfNode(x,y)){
+        new Node(x,y,i);
+      }else{
+        i--;
+      }
     }
 
     NODES.forEach(function(node1){
