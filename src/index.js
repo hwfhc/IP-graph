@@ -12,12 +12,13 @@
   var numberOfNode = 50;
 
   var locationRuleOfNode = function(x,y){
-    if((x < canvasEl.width/2-200 || x > canvasEl.width/2+200) ||
+    return true;
+    /*if((x < canvasEl.width/2-200 || x > canvasEl.width/2+200) ||
        (y < canvasEl.height/2-200 || y > canvasEl.height/2+200)){
          return true;
        }else{
          return false
-       }
+       }*/
   }
 
   var NODES = [];
@@ -241,28 +242,29 @@
     ctx.fillStyle = backgroundColor;
     ctx.fillRect(0, 0, canvasEl.width, canvasEl.height);
 
-    NODES.forEach(function (node) {
-      ctx.fillStyle  = node.color;
+    for(var i=0;i<NODES.length;i++){
+      ctx.fillStyle  = NODES[i].color;
       ctx.beginPath();
-      ctx.arc(node.x, node.y, node.radius, 0, 2 * Math.PI);
+      ctx.arc(NODES[i].x, NODES[i].y, NODES[i].radius, 0, 2 * Math.PI);
       ctx.fill();
-    });
+    }
 
-    LINKS.forEach(function(link){
+    for(var i=0;i<LINKS.length;i++){
       ctx.strokeStyle = edgeColor;
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(link.origin.x,link.origin.y);
-      ctx.lineTo(link.destination.x,link.destination.y);
+      ctx.moveTo(LINKS[i].origin.x,LINKS[i].origin.y);
+      ctx.lineTo(LINKS[i].destination.x,LINKS[i].destination.y);
       ctx.stroke();
-    });
+    }
 
-    PACKETS.forEach(function(packet){
+    for(var i=0;i<PACKETS.length;i++){
       ctx.fillStyle  = packetColor;
       ctx.beginPath();
-      ctx.arc(packet.x, packet.y, 4, 0, 2 * Math.PI);
+      ctx.arc(PACKETS[i].x, PACKETS[i].y, 4, 0, 2 * Math.PI);
       ctx.fill();
-    });
+    }
+
   }
 
   window.onresize = function () {
@@ -287,7 +289,7 @@
     NODES.forEach(function(node1){
       NODES.forEach(function(node2){
         var distance = Math.sqrt(Math.pow((node1.x - node2.x), 2) + Math.pow((node1.y - node2.y), 2));
-        if(distance < 150){
+        if(distance < 100){
           new Link(node1,node2);
         }
       });
@@ -297,7 +299,7 @@
       NODES.forEach(function(node2){
         if(node1.graph != node2.graph){
           var distance = Math.sqrt(Math.pow((node1.x - node2.x), 2) + Math.pow((node1.y - node2.y), 2));
-          if(distance < 250){
+          if(distance < 300){
             new Link(node1,node2);
           }
         }
