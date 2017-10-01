@@ -1,17 +1,17 @@
 (function(){
-  var canvasEl = document.getElementById('canvas');
-  var ctx = canvasEl.getContext('2d');
+  const canvasEl = document.getElementById('canvas');
+  const ctx = canvasEl.getContext('2d');
 
-  var backgroundColor = '#000';
-  var nodeColor = '#0a32c8';
-  var edgeColor = '#0527af';
-  var packetColor = '#2f5af0';
-  var packetSpeed = 6;
-  var radiusOfNode = 3;
+  const backgroundColor = '#000';
+  const nodeColor = '#0a32c8';
+  const edgeColor = '#0527af';
+  const packetColor = '#2f5af0';
+  const packetSpeed = 6;
+  const radiusOfNode = 3;
 
-  var numberOfNode = 50;
+  const numberOfNode = 75;
 
-  var locationRuleOfNode = function(x,y){
+  const locationRuleOfNode = function(x,y){
     return true;
     /*if((x < canvasEl.width/2-200 || x > canvasEl.width/2+200) ||
        (y < canvasEl.height/2-200 || y > canvasEl.height/2+200)){
@@ -23,7 +23,9 @@
 
   var NODES = [];
   var PACKETS = [];
-  var LINKS = [];
+  var LINKS = []
+  var AS = [];
+
 
   class Node{
       constructor(x,y,address){
@@ -34,14 +36,14 @@
 
         this.routingTable = [];
         this.links = [];
-        this.address = address;
 
+        this.address = address;
         this.graph = address;
 
         NODES.push(this);
       }
 
-      connect(node){
+      connect(node,isIntraAS){
         var index;
         var notDuplicate = this.routingTable.every((item,i) => {
           if(item.address !== node.address){
@@ -64,11 +66,14 @@
           this.routingTable[index].hops = 1;
         }
 
-        if(this.graph < node.graph){
-          node.graph = this.graph;
-        }else{
-          this.graph = node.graph;
+        if(isIntraAS){
+          if(this.graph < node.graph){
+            node.graph = this.graph;
+          }else{
+            this.graph = node.graph;
+          }
         }
+
         this.links.push(node);
       }
 
@@ -214,17 +219,13 @@
   }
 
   class Link{
-      constructor(origin,destination){
+      constructor(origin,destination,isIntraAS){
         this.origin = origin;
         this.destination = destination;
-        this.low = origin.address;
-        this.high = destination.address;
 
-        if((this.high - this.low) > 1){
-          LINKS.push(this);
-          origin.connect(destination);
-          destination.connect(origin);
-        }
+        LINKS.push(this);
+        origin.connect(destination,isIntraAS);
+        destination.connect(origin,isIntraAS);
       }
   }
 
@@ -243,6 +244,8 @@
     ctx.fillRect(0, 0, canvasEl.width, canvasEl.height);
 
     for(var i=0;i<NODES.length;i++){
+      ctx.fillStyle  = '#ffffff';
+      ctx.fillText(`${NODES[i].graph}.${NODES[i].address}`,NODES[i].x,NODES[i].y,20)
       ctx.fillStyle  = NODES[i].color;
       ctx.beginPath();
       ctx.arc(NODES[i].x, NODES[i].y, NODES[i].radius, 0, 2 * Math.PI);
@@ -275,36 +278,60 @@
     LINKS = [];
     PACKETS = [];
 
-    for (var i = 0; i < numberOfNode; i++) {
-      var x = Math.random() * canvasEl.width;
-      var y = Math.random() * canvasEl.height;
+    generateNode();
+    generateAS();
+    generateGateway();
+    connectAS();
 
-      if(locationRuleOfNode(x,y)){
-        new Node(x,y,i);
-      }else{
-        i--;
+
+    function generateNode(){
+      for (var i = 0; i < numberOfNode; i++) {
+        var x = Math.random() * canvasEl.width;
+        var y = Math.random() * canvasEl.height;
+
+        if(locationRuleOfNode(x,y)){
+          new Node(x,y,i);
+        }else{
+          i--;
+        }
       }
     }
 
-    NODES.forEach(function(node1){
-      NODES.forEach(function(node2){
-        var distance = Math.sqrt(Math.pow((node1.x - node2.x), 2) + Math.pow((node1.y - node2.y), 2));
-        if(distance < 100){
-          new Link(node1,node2);
-        }
-      });
-    });
-
-    NODES.forEach(function(node1){
-      NODES.forEach(function(node2){
-        if(node1.graph != node2.graph){
+    function generateAS(){
+      NODES.forEach(function(node1){
+        NODES.forEach(function(node2){
           var distance = Math.sqrt(Math.pow((node1.x - node2.x), 2) + Math.pow((node1.y - node2.y), 2));
-          if(distance < 300){
-            new Link(node1,node2);
+          if(distance < 150 && node2.links.length === 0){
+            new Link(node1,node2,true);
           }
-        }
+        });
       });
-    });
+
+      for(var i=0;i<NODES.length;i++){
+        let tem = [];
+        for(var j=0;j<NODES.length;j++){
+          if(NODES[j].graph == i) tem.push(NODES[j]);
+        }
+
+        if(tem.length !== 0) AS.push({
+          nodes : tem,
+          graphp : i
+        });
+      }
+    }
+
+    function generateGateway(){
+      for(var i=0;i<AS.length;i++){
+        AS[i].gateway = AS[i].nodes[0];
+        AS[i].gateway.color = '#ffffff';
+      }
+    }
+
+    function connectAS(){
+      for(var i=0;i<AS.length-1;i++){
+        new Link(AS[i].gateway,AS[i+1].gateway,false);
+      }
+    }
 
     NODES.forEach(function(node){
       node.sendAdvertisement(node.address);
@@ -323,5 +350,6 @@
     }
   },250);
   console.log(NODES);
+  console.log(AS);
 
 })();
