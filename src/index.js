@@ -27,8 +27,9 @@
   var AS = [];
 
 
-  class Node{
+  class Node extends EventEmitter{
       constructor(x,y,address){
+        super();
         this.x = x;
         this.y = y;
         this.radius = radiusOfNode;
@@ -40,7 +41,89 @@
         this.address = address;
         this.graph = address;
 
+        this.isGateway;
+
         NODES.push(this);
+
+        this.addListener('receive_advertisement',(newTable,from,source) => {
+          addNewItemToRoutingTable.call(this);
+          updateItemInformationInRoutingTable.call(this);
+          broadcost.call(this);
+
+          function addNewItemToRoutingTable(){
+            newTable.forEach((newItem,index) => {
+              var isNotHaveItem = this.routingTable.every((item,index) => {
+                if(item.address !== newItem.address) return true;
+              });
+
+              if(isNotHaveItem){
+                var obj = {
+                  address: newItem.address,
+                  linkID: undefined,
+                  hops: 10000,
+                }
+                this.routingTable.push(obj);
+              }
+            });
+
+          }
+
+          function updateItemInformationInRoutingTable(){
+            var links = this.links;
+
+            this.routingTable.forEach((item,index) => {
+              var newItem = getItemWithAddress(this.routingTable[index].address,newTable);
+
+              if(newItem && item.hops > (newItem.hops + 1)){
+                item.hops = newItem.hops + 1;
+                item.linkID = getLinkIdOfFrom();
+              }
+            });
+
+
+            function getItemWithAddress(address,table){
+              for(var i=0;i<table.length;i++){
+                if(table[i].address == address) return table[i];
+              }
+            }
+
+            function getLinkIdOfFrom(){
+              for(var i=0;i<links.length;i++){
+                if(from === links[i]){
+                  return i;
+                };
+              }
+            }
+
+          }
+
+          function broadcost(){
+            var isSend;
+            for(var i=0;i<this.routingTable.length;i++){
+              if(this.routingTable[i].address === source){
+                for(var j=0;j<this.links.length;j++){
+                  if(this.links[j] === from && this.routingTable[i].linkID === j) isSend = true;
+                }
+              }}
+
+
+            if(isSend){
+              this.sendAdvertisement(source,from);
+            }
+          }
+
+          function isGateway(node){
+            return node.isGateway;
+          }
+
+        });
+
+        this.addListener('receive_packet',packet => {
+          var index = PACKETS.indexOf(packet);
+          PACKETS.splice(index, 1);
+          if(this.address !== packet.address) this.send(packet.address);
+        });
+
       }
 
       connect(node,isIntraAS){
@@ -77,12 +160,6 @@
         this.links.push(node);
       }
 
-      receive(packet){
-        var index = PACKETS.indexOf(packet);
-        PACKETS.splice(index, 1);
-        if(this.address !== packet.address) this.send(packet.address);
-      }
-
       send(address){
         var linkID = getLinkID.call(this);
 
@@ -105,77 +182,8 @@
 
       sendAdvertisement(source,from){
         this.links.forEach((node) => {
-          if(node != from) node.getAdvertisement(this.routingTable,this,source);
+          if(node != from) node.emitEvent('receive_advertisement',[this.routingTable,this,source]);
         });
-      }
-
-      getAdvertisement(newTable,from,source){
-        addNewItemToRoutingTable.call(this);
-        updateItemInformationInRoutingTable.call(this);
-        broadcost.call(this);
-
-        function addNewItemToRoutingTable(){
-          newTable.forEach((newItem,index) => {
-            var isNotHaveItem = this.routingTable.every((item,index) => {
-              if(item.address !== newItem.address) return true;
-            });
-
-            if(isNotHaveItem){
-              var obj = {
-                address: newItem.address,
-                linkID: undefined,
-                hops: 10000,
-              }
-              this.routingTable.push(obj);
-            }
-          });
-
-        }
-
-        function updateItemInformationInRoutingTable(){
-          var links = this.links;
-
-          this.routingTable.forEach((item,index) => {
-            var newItem = getItemWithAddress(this.routingTable[index].address,newTable);
-
-            if(newItem && item.hops > (newItem.hops + 1)){
-              item.hops = newItem.hops + 1;
-              item.linkID = getLinkIdOfFrom();
-            }
-          });
-
-
-          function getItemWithAddress(address,table){
-            for(var i=0;i<table.length;i++){
-              if(table[i].address == address) return table[i];
-            }
-          }
-
-          function getLinkIdOfFrom(){
-            for(var i=0;i<links.length;i++){
-              if(from === links[i]){
-                return i;
-              };
-            }
-          }
-
-        }
-
-        function broadcost(){
-          var isSend;
-          for(var i=0;i<this.routingTable.length;i++){
-            if(this.routingTable[i].address === source){
-              for(var j=0;j<this.links.length;j++){
-                if(this.links[j] === from && this.routingTable[i].linkID === j) isSend = true;
-              }
-            }}
-
-
-          if(isSend){
-            this.sendAdvertisement(source,from);
-          }
-        }
-
       }
   }
 
@@ -195,7 +203,7 @@
 
         this.addListener('arrive',function arriveListener(){
           this.removeListener('arrive',arriveListener);
-          destination.receive(this);
+          destination.emitEvent('receive_packet',[this]);
         });
 
         PACKETS.push(this);
@@ -324,6 +332,7 @@
       for(var i=0;i<AS.length;i++){
         AS[i].gateway = AS[i].nodes[0];
         AS[i].gateway.color = '#ffffff';
+        AS[i].gateway.isGateway = true;
       }
     }
 
