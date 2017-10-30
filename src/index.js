@@ -126,7 +126,7 @@
 
       }
 
-      connect(node,isIntraAS){
+      connect(node,isIntraAS,link){
         var index;
         var notDuplicate = this.routingTable.every((item,i) => {
           if(item.address !== node.address){
@@ -157,14 +157,18 @@
           }
         }
 
-        this.links.push(node);
+        this.links.push(link);
       }
 
       send(address){
         var linkID = getLinkID.call(this);
 
         if(linkID != undefined){
-          new Packet(this,this.links[linkID],address);
+          var data = {origin:this,
+            destination:this.links[linkID],
+            address};
+          this.links[linkID].emitEvent('receive',[data,this.links[linkID]]);
+
         }else{
           console.error('You cannot send packet to yourself!');
         }
@@ -182,7 +186,7 @@
 
       sendAdvertisement(source,from){
         this.links.forEach((node) => {
-          if(node != from) node.emitEvent('receive_advertisement',[this.routingTable,this,source]);
+          if(node.getOtherSide(this) != from) node.getOtherSide(this).emitEvent('receive_advertisement',[this.routingTable,this,source]);
         });
       }
   }
@@ -209,10 +213,6 @@
         PACKETS.push(this);
       }
 
-      arrive(){
-        this.emitEvent('arrive');
-      }
-
       move(){
         var distance = Math.sqrt(Math.pow((this.x - this.destination.x), 2) + Math.pow((this.y - this.destination.y), 2));
 
@@ -220,26 +220,44 @@
           this.x += packetSpeed * this.cos;
           this.y += packetSpeed * this.sin;
         }else{
-          this.arrive();
+          this.emitEvent('arrive');
         }
       }
 
   }
 
-  class Link{
+  class Link extends EventEmitter{
       constructor(origin,destination,isIntraAS){
+        super();
+        this.packets = [];
+
         this.origin = origin;
         this.destination = destination;
 
         LINKS.push(this);
-        origin.connect(destination,isIntraAS);
-        destination.connect(origin,isIntraAS);
+        origin.connect(destination,isIntraAS,this);
+        destination.connect(origin,isIntraAS,this);
+
+        this.addListener('receive',(data,from) => {
+          console.log(from);
+
+          this.packets.push(new Packet(data.origin,data.destination,data.address));
+
+        /*  var index = PACKETS.indexOf(packet);
+          PACKETS.splice(index, 1);
+          if(this.address !== packet.address) this.send(packet.address);*/
+        });
+      }
+
+      getOtherSide(from){
+        if(from === this.origin) return this.destination;
+        return this.origin;
       }
   }
 
   function calculus(){
-    PACKETS.forEach(function(packet){
-      packet.move();
+    LINKS.forEach(link => {
+      link.packets.forEach(packet => packet.move());
     });
 
     render();
