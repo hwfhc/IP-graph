@@ -9,7 +9,7 @@
   const packetSpeed = 6;
   const radiusOfNode = 3;
 
-  const numberOfNode = 75;
+  const numberOfNode = 6;
 
   const locationRuleOfNode = function(x,y){
     return true;
@@ -38,10 +38,13 @@
         this.routingTable = [];
         this.links = [];
 
-        this.address = address;
-        this.graph = address;
+        this.network = address;
+        this.host = address;
+        this.ID = address;
+
 
         this.isGateway;
+        initRoutingTable(this,this.links);
 
         NODES.push(this);
 
@@ -124,9 +127,18 @@
           if(this.address !== packet.address) this.send(packet.address);
         });
 
+
+        function initRoutingTable(node,links){
+          for(var i=0;i<links.length;i++)
+            node.routingTable.push({
+              address: links[0].address,
+              linkID: i,
+              hops: 1,
+            });
+        }
       }
 
-      connect(node,isIntraAS,link){
+      /*connect(node,isIntraAS,link){
         var index;
         var notDuplicate = this.routingTable.every((item,i) => {
           if(item.address !== node.address){
@@ -158,16 +170,23 @@
         }
 
         this.links.push(link);
-      }
+      }*/
 
       send(address){
-        var linkID = getLinkID.call(this);
+        this.links[2].emitEvent('receive_packet_from_node',[this,address]);
+
+        function Routing(){
+
+        }
+      }
+
+      /*  var linkID = getLinkID.call(this);
 
         if(linkID != undefined){
           var data = {origin:this,
             destination:this.links[linkID],
             address};
-          this.links[linkID].emitEvent('receive',[data,this.links[linkID]]);
+          this.links[linkID].emitEvent('receive_packet',[data,this]);
 
         }else{
           console.error('You cannot send packet to yourself!');
@@ -181,12 +200,12 @@
 
           if(link) return link.linkID;
           return undefined;
-        }
-      }
+        }*/
 
       sendAdvertisement(source,from){
         this.links.forEach((node) => {
-          if(node.getOtherSide(this) != from) node.getOtherSide(this).emitEvent('receive_advertisement',[this.routingTable,this,source]);
+          if(node.getAnotherSide(this) != from)
+            node.getAnotherSide(this).emitEvent('receive_advertisement',[this.routingTable,this,source]);
         });
       }
   }
@@ -231,17 +250,22 @@
         super();
         this.packets = [];
 
-        this.origin = origin;
-        this.destination = destination;
+        this.lside = origin.ID;
+        this.rside = destination.ID;
 
+        origin.links.push(this);
+        destination.links.push(this);
         LINKS.push(this);
-        origin.connect(destination,isIntraAS,this);
-        destination.connect(origin,isIntraAS,this);
 
-        this.addListener('receive',(data,from) => {
-          console.log(from);
+        this.addListener('receive_packet_from_node',(from,address) => {
+          var packet;
+          var origin = getNodeByID(this.lside);
+          var destination = getNodeByID(this.rside);
 
-          this.packets.push(new Packet(data.origin,data.destination,data.address));
+          if(from == origin) packet = new Packet(origin,destination,address);
+          packet = new Packet(destination,origin,address);
+
+          this.packets.push(packet);
 
         /*  var index = PACKETS.indexOf(packet);
           PACKETS.splice(index, 1);
@@ -249,7 +273,13 @@
         });
       }
 
-      getOtherSide(from){
+      transfer(){
+        this.packets.forEach(item => {
+          item.move();
+        });
+      }
+
+      getAnotherSide(from){
         if(from === this.origin) return this.destination;
         return this.origin;
       }
@@ -257,7 +287,7 @@
 
   function calculus(){
     LINKS.forEach(link => {
-      link.packets.forEach(packet => packet.move());
+      link.transfer();
     });
 
     render();
@@ -266,34 +296,54 @@
   }
 
   function render() {
-    ctx.fillStyle = backgroundColor;
-    ctx.fillRect(0, 0, canvasEl.width, canvasEl.height);
 
-    for(var i=0;i<NODES.length;i++){
-      ctx.fillStyle  = '#ffffff';
-      ctx.fillText(`${NODES[i].graph}.${NODES[i].address}`,NODES[i].x,NODES[i].y,20)
-      ctx.fillStyle  = NODES[i].color;
-      ctx.beginPath();
-      ctx.arc(NODES[i].x, NODES[i].y, NODES[i].radius, 0, 2 * Math.PI);
-      ctx.fill();
+    renderBackground();
+    renderNodes();
+    renderLinks();
+    renderPackets();
+
+    function renderBackground(){
+      ctx.fillStyle = backgroundColor;
+      ctx.fillRect(0, 0, canvasEl.width, canvasEl.height);
     }
 
-    for(var i=0;i<LINKS.length;i++){
-      ctx.strokeStyle = edgeColor;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(LINKS[i].origin.x,LINKS[i].origin.y);
-      ctx.lineTo(LINKS[i].destination.x,LINKS[i].destination.y);
-      ctx.stroke();
+    function renderNodes(){
+      for(var i=0;i<NODES.length;i++){
+        ctx.fillStyle  = '#ffffff';
+        ctx.fillText(`${NODES[i].network}.${NODES[i].network}`,NODES[i].x,NODES[i].y,20)
+        ctx.fillStyle  = NODES[i].color;
+        ctx.beginPath();
+        ctx.arc(NODES[i].x, NODES[i].y, NODES[i].radius, 0, 2 * Math.PI);
+        ctx.fill();
+      }
     }
 
-    for(var i=0;i<PACKETS.length;i++){
-      ctx.fillStyle  = packetColor;
-      ctx.beginPath();
-      ctx.arc(PACKETS[i].x, PACKETS[i].y, 4, 0, 2 * Math.PI);
-      ctx.fill();
+    function renderLinks(){
+      for(var i=0;i<LINKS.length;i++){
+        var lside = getNodeByID(LINKS[i].lside);
+        var rside = getNodeByID(LINKS[i].rside);
+
+        ctx.strokeStyle = edgeColor;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(lside.x,lside.y);
+        ctx.lineTo(rside.x,rside.y);
+        ctx.stroke();
+      }
     }
 
+    function renderPackets(){
+      for(var i=0;i<PACKETS.length;i++){
+        ctx.fillStyle  = packetColor;
+        ctx.beginPath();
+        ctx.arc(PACKETS[i].x, PACKETS[i].y, 4, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+    }
+  }
+
+  function getNodeByID(ID){
+    return NODES[ID];
   }
 
   window.onresize = function () {
@@ -307,8 +357,6 @@
     generateNode();
     generateAS();
     generateGateway();
-    connectAS();
-
 
     function generateNode(){
       for (var i = 0; i < numberOfNode; i++) {
@@ -324,25 +372,36 @@
     }
 
     function generateAS(){
-      NODES.forEach(function(node1){
-        NODES.forEach(function(node2){
-          var distance = Math.sqrt(Math.pow((node1.x - node2.x), 2) + Math.pow((node1.y - node2.y), 2));
-          if(distance < 150 && node2.links.length === 0){
-            new Link(node1,node2,true);
+      createLinkOfNodes();
+      createAS();
+
+      function createLinkOfNodes(){
+        for(var i=0;i<NODES.length;i++){
+          for(var j=i+1;j<NODES.length;j++){
+            var node1 = NODES[i];
+            var node2 = NODES[j];
+
+            var distance = Math.sqrt(Math.pow((node1.x - node2.x), 2) + Math.pow((node1.y - node2.y), 2));
+
+            if(distance < 500 && node2.links.length === 0){
+              new Link(node1,node2,true);
+            }
           }
-        });
-      });
-
-      for(var i=0;i<NODES.length;i++){
-        let tem = [];
-        for(var j=0;j<NODES.length;j++){
-          if(NODES[j].graph == i) tem.push(NODES[j]);
         }
+      }
 
-        if(tem.length !== 0) AS.push({
-          nodes : tem,
-          graphp : i
-        });
+      function createAS(){
+        for(var i=0;i<NODES.length;i++){
+          let tem = [];
+          for(var j=0;j<NODES.length;j++){
+            if(NODES[j].graph == i) tem.push(NODES[j]);
+          }
+
+          if(tem.length !== 0) AS.push({
+            nodes : tem,
+            graphp : i
+          });
+        }
       }
     }
 
@@ -369,14 +428,15 @@
   window.onresize();
   window.requestAnimationFrame(calculus);
 
-  setInterval(function(){
+/*  setInterval(function(){
     var origin = parseInt(Math.random()*numberOfNode);
     var destination = parseInt(Math.random()*numberOfNode);
     if(origin != destination){
       NODES[origin].send(destination);
     }
-  },250);
+  },250);*/
+  NODES[0].send(1);
   console.log(NODES);
-  console.log(AS);
+  console.log(LINKS);
 
 })();
