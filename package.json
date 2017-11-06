@@ -1,0 +1,27 @@
+{
+  "name": "ip-graph",
+  "version": "1.0.0",
+  "description": "draw ip graph by canvas",
+  "main": "index.js",
+  "directories": {
+    "example": "examples"
+  },
+  "scripts": {
+    "build": "node build/build.js",
+    "build-pro": "node build/build.js --production",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/hwfhc/IP-graph.git"
+  },
+  "author": "hwfhc",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/hwfhc/IP-graph/issues"
+  },
+  "homepage": "https://github.com/hwfhc/IP-graph#readme",
+  "devDependencies": {
+    "webpack": "^3.8.1"
+  }
+}
