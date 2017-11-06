@@ -24,29 +24,31 @@
   var NODES = [];
   var PACKETS = [];
   var LINKS = []
-  var AS = [];
-
+  var NETWORKS = [];
 
   class Node extends EventEmitter{
       constructor(x,y,address){
         super();
+
+        //configuration about canvas
         this.x = x;
         this.y = y;
         this.radius = radiusOfNode;
         this.color = nodeColor;
+        this.ID = NODES.length;
+        NODES.push(this);
 
+
+        //configuration about IP
         this.routingTable = [];
         this.links = [];
 
         this.network = address;
         this.host = address;
-        this.ID = address;
-
 
         this.isGateway;
-        initRoutingTable(this,this.links);
 
-        NODES.push(this);
+
 
         this.addListener('receive_advertisement',(newTable,from,source) => {
           addNewItemToRoutingTable.call(this);
@@ -127,14 +129,40 @@
           if(this.address !== packet.address) this.send(packet.address);
         });
 
+        this.addListener('create_new_link',link => {
+          this.links.push(link);
 
-        function initRoutingTable(node,links){
-          for(var i=0;i<links.length;i++)
-            node.routingTable.push({
-              address: links[0].address,
-              linkID: i,
-              hops: 1,
-            });
+          var node = getNodeByID(link.getAnotherSideID(this));
+          var IP = node.getIP();
+          var textOfIP = `${node.network}.${node.host}`;
+
+          this.routingTable.push({
+            IP: IP,
+            address: textOfIP,
+            linkID: this.links.length - 1,
+            hops: 1,
+          });
+
+        });
+      }
+
+      getIP(){
+        return (this.network << 8) + this.host;
+      }
+
+      //function about IP
+      sendAdvertisement(source,from){
+        this.links.forEach((link) => {
+          if(link.getAnotherSideID(this) != from)
+            link.getAnotherSideID(this).emitEvent('receive_advertisement',[this.routingTable,this,source]);
+        });
+      }
+
+      send(address){
+        this.links[2].emitEvent('receive_packet_from_node',[this,address]);
+
+        function Routing(){
+
         }
       }
 
@@ -172,14 +200,6 @@
         this.links.push(link);
       }*/
 
-      send(address){
-        this.links[2].emitEvent('receive_packet_from_node',[this,address]);
-
-        function Routing(){
-
-        }
-      }
-
       /*  var linkID = getLinkID.call(this);
 
         if(linkID != undefined){
@@ -201,13 +221,6 @@
           if(link) return link.linkID;
           return undefined;
         }*/
-
-      sendAdvertisement(source,from){
-        this.links.forEach((node) => {
-          if(node.getAnotherSide(this) != from)
-            node.getAnotherSide(this).emitEvent('receive_advertisement',[this.routingTable,this,source]);
-        });
-      }
   }
 
   class Packet extends EventEmitter{
@@ -253,9 +266,10 @@
         this.lside = origin.ID;
         this.rside = destination.ID;
 
-        origin.links.push(this);
-        destination.links.push(this);
         LINKS.push(this);
+
+        origin.emitEvent('create_new_link',[this]);
+        destination.emitEvent('create_new_link',[this]);
 
         this.addListener('receive_packet_from_node',(from,address) => {
           var packet;
@@ -266,10 +280,6 @@
           packet = new Packet(destination,origin,address);
 
           this.packets.push(packet);
-
-        /*  var index = PACKETS.indexOf(packet);
-          PACKETS.splice(index, 1);
-          if(this.address !== packet.address) this.send(packet.address);*/
         });
       }
 
@@ -279,9 +289,9 @@
         });
       }
 
-      getAnotherSide(from){
-        if(from === this.origin) return this.destination;
-        return this.origin;
+      getAnotherSideID(from){
+        if(from.ID === this.lside) return this.rside;
+        return this.lside;
       }
   }
 
@@ -355,7 +365,7 @@
     PACKETS = [];
 
     generateNode();
-    generateAS();
+    generateNetwork();
     generateGateway();
 
     function generateNode(){
@@ -371,9 +381,9 @@
       }
     }
 
-    function generateAS(){
+    function generateNetwork(){
       createLinkOfNodes();
-      createAS();
+      createNetwork();
 
       function createLinkOfNodes(){
         for(var i=0;i<NODES.length;i++){
@@ -390,14 +400,15 @@
         }
       }
 
-      function createAS(){
+      //或许我需要写一个DFS算法来获取局域网内所有节点
+      function createNetwork(){
         for(var i=0;i<NODES.length;i++){
           let tem = [];
           for(var j=0;j<NODES.length;j++){
-            if(NODES[j].graph == i) tem.push(NODES[j]);
+            if(NODES[j].network == i) tem.push(NODES[j]);
           }
 
-          if(tem.length !== 0) AS.push({
+          if(tem.length !== 0) NETWORKS.push({
             nodes : tem,
             graphp : i
           });
@@ -406,10 +417,10 @@
     }
 
     function generateGateway(){
-      for(var i=0;i<AS.length;i++){
-        AS[i].gateway = AS[i].nodes[0];
-        AS[i].gateway.color = '#ffffff';
-        AS[i].gateway.isGateway = true;
+      for(var i=0;i<NETWORKS.length;i++){
+        NETWORKS[i].gateway = NETWORKS[i].nodes[0];
+        NETWORKS[i].gateway.color = '#ffffff';
+        NETWORKS[i].gateway.isGateway = true;
       }
     }
 
@@ -419,9 +430,9 @@
       }
     }
 
-    NODES.forEach(function(node){
+    /*NODES.forEach(function(node){
       node.sendAdvertisement(node.address);
-    });
+    });*/
     render();
   };
 
@@ -438,5 +449,6 @@
   NODES[0].send(1);
   console.log(NODES);
   console.log(LINKS);
+  console.log(NETWORKS);
 
 })();
