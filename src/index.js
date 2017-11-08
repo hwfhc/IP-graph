@@ -1,6 +1,4 @@
 (function(){
-  const EventEmitter = require('EventEmitter.min.js');
-
   const canvasEl = document.getElementById('canvas');
   const ctx = canvasEl.getContext('2d');
 
@@ -10,8 +8,8 @@
   const packetColor = '#2f5af0';
   const packetSpeed = 6;
   const radiusOfNode = 3;
-
-  const numberOfNode = 6;
+  const lengthOfLink = 250;
+  const numberOfNode = 60;
 
   const locationRuleOfNode = function(x,y){
     return true;
@@ -152,6 +150,14 @@
         return (this.network << 8) + this.host;
       }
 
+      getNetwork(){
+        return this.network;
+      }
+
+      getHost(){
+        return this.host;
+      }
+
       //function about IP
       sendAdvertisement(source,from){
         this.links.forEach((link) => {
@@ -167,40 +173,6 @@
 
         }
       }
-
-      /*connect(node,isIntraAS,link){
-        var index;
-        var notDuplicate = this.routingTable.every((item,i) => {
-          if(item.address !== node.address){
-            return true;
-          }else{
-            index = i;
-            return false;
-          }
-        });
-
-        if(notDuplicate){
-          var newItem = {
-            address: node.address,
-            linkID: this.links.length,
-            hops: 1,
-          }
-          this.routingTable.push(newItem);
-        }else{
-          this.routingTable[index].linkID = this.links.length;
-          this.routingTable[index].hops = 1;
-        }
-
-        if(isIntraAS){
-          if(this.graph < node.graph){
-            node.graph = this.graph;
-          }else{
-            this.graph = node.graph;
-          }
-        }
-
-        this.links.push(link);
-      }*/
 
       /*  var linkID = getLinkID.call(this);
 
@@ -261,12 +233,14 @@
   }
 
   class Link extends EventEmitter{
-      constructor(origin,destination,isIntraAS){
+      constructor(origin,destination,isCrossNetwork){
         super();
         this.packets = [];
 
         this.lside = origin.ID;
         this.rside = destination.ID;
+
+        if(!isCrossNetwork) formNetwork();
 
         LINKS.push(this);
 
@@ -283,6 +257,14 @@
 
           this.packets.push(packet);
         });
+
+        function formNetwork(){
+          if(origin.network < destination.network)
+            destination.network = origin.network;
+          else
+            origin.network = destination.network;
+        }
+
       }
 
       transfer(){
@@ -322,7 +304,7 @@
     function renderNodes(){
       for(var i=0;i<NODES.length;i++){
         ctx.fillStyle  = '#ffffff';
-        ctx.fillText(`${NODES[i].network}.${NODES[i].network}`,NODES[i].x,NODES[i].y,20)
+        ctx.fillText(`${NODES[i].network}.${NODES[i].host}`,NODES[i].x,NODES[i].y,20)
         ctx.fillStyle  = NODES[i].color;
         ctx.beginPath();
         ctx.arc(NODES[i].x, NODES[i].y, NODES[i].radius, 0, 2 * Math.PI);
@@ -369,6 +351,7 @@
     generateNode();
     generateNetwork();
     generateGateway();
+    connectNetwork();
 
     function generateNode(){
       for (var i = 0; i < numberOfNode; i++) {
@@ -395,14 +378,13 @@
 
             var distance = Math.sqrt(Math.pow((node1.x - node2.x), 2) + Math.pow((node1.y - node2.y), 2));
 
-            if(distance < 500 && node2.links.length === 0){
-              new Link(node1,node2,true);
+            if(distance < lengthOfLink && node2.links.length === 0){
+              new Link(node1,node2);
             }
           }
         }
       }
 
-      //或许我需要写一个DFS算法来获取局域网内所有节点
       function createNetwork(){
         for(var i=0;i<NODES.length;i++){
           let tem = [];
@@ -412,7 +394,7 @@
 
           if(tem.length !== 0) NETWORKS.push({
             nodes : tem,
-            graphp : i
+            network : i
           });
         }
       }
@@ -426,10 +408,9 @@
       }
     }
 
-    function connectAS(){
-      for(var i=0;i<AS.length-1;i++){
-        new Link(AS[i].gateway,AS[i+1].gateway,false);
-      }
+    function connectNetwork(){
+      for(var i=0;i<NETWORKS.length-1;i++)
+        new Link(NETWORKS[i].gateway,NETWORKS[i+1].gateway,true);
     }
 
     /*NODES.forEach(function(node){
