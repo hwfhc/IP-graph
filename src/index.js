@@ -22,7 +22,6 @@
   }
 
   var NODES = [];
-  var PACKETS = [];
   var LINKS = []
   var NETWORKS = [];
 
@@ -58,16 +57,16 @@
           function addNewItemToRoutingTable(){
             newTable.forEach((newItem,index) => {
               var isNotHaveItem = this.routingTable.every((item,index) => {
-                if(item.address !== newItem.address) return true;
+                if(item.IP !== newItem.IP) return true;
               });
 
               if(isNotHaveItem){
-                var obj = {
+                this.routingTable.push({
+                  IP: newItem.IP,
                   address: newItem.address,
-                  linkID: undefined,
-                  hops: 10000,
-                }
-                this.routingTable.push(obj);
+                  linkID: this.links.length - 1,
+                  hops: 1000,
+                });
               }
             });
 
@@ -161,8 +160,9 @@
       //function about IP
       sendAdvertisement(source,from){
         this.links.forEach((link) => {
-          if(link.getAnotherSideID(this) != from)
-            link.getAnotherSideID(this).emitEvent('receive_advertisement',[this.routingTable,this,source]);
+          var anotherNode = getNodeByID(link.getAnotherSideID(this));
+          if(anotherNode != from)
+            anotherNode.emitEvent('receive_advertisement',[this.routingTable,this,source]);
         });
       }
 
@@ -173,28 +173,6 @@
 
         }
       }
-
-      /*  var linkID = getLinkID.call(this);
-
-        if(linkID != undefined){
-          var data = {origin:this,
-            destination:this.links[linkID],
-            address};
-          this.links[linkID].emitEvent('receive_packet',[data,this]);
-
-        }else{
-          console.error('You cannot send packet to yourself!');
-        }
-
-
-        function getLinkID(){
-          var link = this.routingTable.filter((item)=>{
-            if(item.address === address) return true;
-          })[0];
-
-          if(link) return link.linkID;
-          return undefined;
-        }*/
   }
 
   class Packet extends EventEmitter{
@@ -215,8 +193,6 @@
           this.removeListener('arrive',arriveListener);
           destination.emitEvent('receive_packet',[this]);
         });
-
-        PACKETS.push(this);
       }
 
       move(){
@@ -240,7 +216,7 @@
         this.lside = origin.ID;
         this.rside = destination.ID;
 
-        if(!isCrossNetwork) formNetwork();
+        if(!isCrossNetwork) updateNetworkNumber();
 
         LINKS.push(this);
 
@@ -258,7 +234,7 @@
           this.packets.push(packet);
         });
 
-        function formNetwork(){
+        function updateNetworkNumber(){
           if(origin.network < destination.network)
             destination.network = origin.network;
           else
@@ -276,6 +252,10 @@
       getAnotherSideID(from){
         if(from.ID === this.lside) return this.rside;
         return this.lside;
+      }
+
+      getPackets(){
+        return this.packets;
       }
   }
 
@@ -327,11 +307,14 @@
     }
 
     function renderPackets(){
-      for(var i=0;i<PACKETS.length;i++){
-        ctx.fillStyle  = packetColor;
-        ctx.beginPath();
-        ctx.arc(PACKETS[i].x, PACKETS[i].y, 4, 0, 2 * Math.PI);
-        ctx.fill();
+      ctx.fillStyle  = packetColor;
+
+      for(var i=0;i<LINKS.length;i++){
+        LINKS[i].getPackets().forEach(item => {
+          ctx.beginPath();
+          ctx.arc(item.x, item.y, 4, 0, 2 * Math.PI);
+          ctx.fill();
+        });
       }
     }
   }
@@ -340,7 +323,7 @@
     return NODES[ID];
   }
 
-  window.onresize = function () {
+  window.onresize = function init() {
     canvasEl.width = document.body.clientWidth;
     canvasEl.height = canvasEl.clientHeight;
 
@@ -413,9 +396,9 @@
         new Link(NETWORKS[i].gateway,NETWORKS[i+1].gateway,true);
     }
 
-    /*NODES.forEach(function(node){
+    NODES.forEach(function(node){
       node.sendAdvertisement(node.address);
-    });*/
+    });
     render();
   };
 
