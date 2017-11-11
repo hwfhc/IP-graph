@@ -57,14 +57,14 @@
           function addNewItemToRoutingTable(){
             newTable.forEach((newItem,index) => {
               var isNotHaveItem = this.routingTable.every((item,index) => {
-                if(item.IP !== newItem.IP) return true;
+                if(item.IP !== newItem.IP && newItem.IP !== this.getIP()) return true;
               });
 
               if(isNotHaveItem){
                 this.routingTable.push({
                   IP: newItem.IP,
                   address: newItem.address,
-                  linkID: this.links.length - 1,
+                  linkID: undefined,
                   hops: 1000,
                 });
               }
@@ -76,24 +76,24 @@
             var links = this.links;
 
             this.routingTable.forEach((item,index) => {
-              var newItem = getItemWithAddress(this.routingTable[index].address,newTable);
+              var newItem = getItemWithAddress(this.routingTable[index].IP,newTable);
 
               if(newItem && item.hops > (newItem.hops + 1)){
                 item.hops = newItem.hops + 1;
-                item.linkID = getLinkIdOfFrom();
+                item.linkID = getLinkIdOfFrom.call(this);
               }
             });
 
 
-            function getItemWithAddress(address,table){
+            function getItemWithAddress(IP,table){
               for(var i=0;i<table.length;i++){
-                if(table[i].address == address) return table[i];
+                if(table[i].IP == IP) return table[i];
               }
             }
 
             function getLinkIdOfFrom(){
-              for(var i=0;i<links.length;i++){
-                if(from === links[i]){
+              for(var i=0;i<this.links.length;i++){
+                if(from === getNodeByID(this.links[i].getAnotherSideID(this)).getIP()){
                   return i;
                 };
               }
@@ -103,23 +103,22 @@
 
           function broadcost(){
             var isSend;
+
             for(var i=0;i<this.routingTable.length;i++){
-              if(this.routingTable[i].address === source){
+              if(this.routingTable[i].IP === source){
                 for(var j=0;j<this.links.length;j++){
-                  if(this.links[j] === from && this.routingTable[i].linkID === j) isSend = true;
+                  if(this.links[j].getAnotherSideID(this) === from && this.routingTable[i].linkID === j){
+                    isSend = true;
+                  }
                 }
-              }}
+              }
+            }
 
 
             if(isSend){
               this.sendAdvertisement(source,from);
             }
           }
-
-          function isGateway(node){
-            return node.isGateway;
-          }
-
         });
 
         this.addListener('receive_packet',packet => {
@@ -159,10 +158,12 @@
 
       //function about IP
       sendAdvertisement(source,from){
+        if(source === undefined) var source = this.getIP();
+
         this.links.forEach((link) => {
-          var anotherNode = getNodeByID(link.getAnotherSideID(this));
-          if(anotherNode != from)
-            anotherNode.emitEvent('receive_advertisement',[this.routingTable,this,source]);
+          var anotherNodeID = link.getAnotherSideID(this);
+          if(anotherNodeID !== from)
+            getNodeByID(anotherNodeID).emitEvent('receive_advertisement',[this.routingTable,this.getIP(),source]);
         });
       }
 
@@ -333,8 +334,10 @@
 
     generateNode();
     generateNetwork();
-    generateGateway();
-    connectNetwork();
+    //generateGateway();
+    //connectNetwork();
+    generateRoutingTable();
+
 
     function generateNode(){
       for (var i = 0; i < numberOfNode; i++) {
@@ -396,9 +399,12 @@
         new Link(NETWORKS[i].gateway,NETWORKS[i+1].gateway,true);
     }
 
-    NODES.forEach(function(node){
-      node.sendAdvertisement(node.address);
-    });
+    function generateRoutingTable(){
+      NODES.forEach(function(node){
+        node.sendAdvertisement();
+      });
+    }
+
     render();
   };
 
