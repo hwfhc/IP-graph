@@ -45,7 +45,7 @@
         this.network = address;
         this.host = address;
 
-        this.isGateway;
+        this.isGateway = false;
 
 
 
@@ -53,6 +53,7 @@
           addNewItemToRoutingTable.call(this);
           updateItemInformationInRoutingTable.call(this);
           broadcost.call(this);
+
 
           function addNewItemToRoutingTable(){
             newTable.forEach((newItem,index) => {
@@ -116,7 +117,7 @@
 
 
             if(isSend){
-              this.sendAdvertisement(source,from);
+              this.sendAdvertisement(source,this.getIP());
             }
           }
         });
@@ -154,6 +155,10 @@
 
       getHost(){
         return this.host;
+      }
+
+      isGateway(){
+        return this.isGateway;
       }
 
       //function about IP
@@ -334,8 +339,8 @@
 
     generateNode();
     generateNetwork();
-    //generateGateway();
-    //connectNetwork();
+    generateGateway();
+    connectNetwork();
     generateRoutingTable();
 
 
@@ -400,6 +405,13 @@
     }
 
     function generateRoutingTable(){
+      //为何要循环三次？？？这里似乎有个bug(只循环一次路由表项目缺失)，我还没有修复
+      NODES.forEach(function(node){
+        node.sendAdvertisement();
+      });
+      NODES.forEach(function(node){
+        node.sendAdvertisement();
+      });
       NODES.forEach(function(node){
         node.sendAdvertisement();
       });
