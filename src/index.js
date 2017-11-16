@@ -106,7 +106,7 @@
             var isSend;
 
             for(var i=0;i<this.routingTable.length;i++){
-              if(this.routingTable[i].IP === source){
+              if(this.routingTable [i].IP === source){
                 for(var j=0;j<this.links.length;j++){
                   if(this.links[j].getAnotherSideID(this) === from && this.routingTable[i].linkID === j){
                     isSend = true;
@@ -149,6 +149,10 @@
         return (this.network << 8) + this.host;
       }
 
+      getTextOfIP(){
+        return `${this.network}.${this.host}`
+      }
+
       getNetwork(){
         return this.network;
       }
@@ -157,18 +161,27 @@
         return this.host;
       }
 
-      isGateway(){
-        return this.isGateway;
-      }
-
       //function about IP
       sendAdvertisement(source,from){
         if(source === undefined) var source = this.getIP();
 
         this.links.forEach((link) => {
           var anotherNodeID = link.getAnotherSideID(this);
-          if(anotherNodeID !== from)
-            getNodeByID(anotherNodeID).emitEvent('receive_advertisement',[this.routingTable,this.getIP(),source]);
+
+          if(anotherNodeID !== from){
+            if(getNodeByID(anotherNodeID).isGateway && this.isGateway){
+              var routingTableToSended = [];
+
+              this.routingTable.forEach((item) => {
+                if((item.IP >> 8) != this.getNetwork()) routingTableToSended.push(item);
+              });
+            }else{
+              var routingTableToSended = this.routingTable;
+            }
+
+            getNodeByID(anotherNodeID).emitEvent('receive_advertisement',[routingTableToSended,this.getIP(),source]);
+          }
+
         });
       }
 
@@ -406,6 +419,12 @@
 
     function generateRoutingTable(){
       //为何要循环三次？？？这里似乎有个bug(只循环一次路由表项目缺失)，我还没有修复
+      NODES.forEach(function(node){
+        node.sendAdvertisement();
+      });
+      NODES.forEach(function(node){
+        node.sendAdvertisement();
+      });
       NODES.forEach(function(node){
         node.sendAdvertisement();
       });
