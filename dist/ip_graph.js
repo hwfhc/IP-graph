@@ -67,9 +67,13 @@
 /* 0 */
 /***/ (function(module, exports, __webpack_require__) {
 
-(function(){
-  const EventEmitter = __webpack_require__(!(function webpackMissingModule() { var e = new Error("Cannot find module \"EventEmitter.min.js\""); e.code = 'MODULE_NOT_FOUND'; throw e; }()));
+const EventEmitter = __webpack_require__(!(function webpackMissingModule() { var e = new Error("Cannot find module \"EventEmitter.min.js\""); e.code = 'MODULE_NOT_FOUND'; throw e; }()));
 
+(function(){
+
+  /*
+   * constant configuration
+   */
   const canvasEl = document.getElementById('canvas');
   const ctx = canvasEl.getContext('2d');
 
@@ -79,8 +83,8 @@
   const packetColor = '#2f5af0';
   const packetSpeed = 6;
   const radiusOfNode = 3;
-
-  const numberOfNode = 6;
+  const lengthOfLink = 250;
+  const numberOfNode = 60;
 
   const locationRuleOfNode = function(x,y){
     return true;
@@ -93,7 +97,6 @@
   }
 
   var NODES = [];
-  var PACKETS = [];
   var LINKS = []
   var NETWORKS = [];
 
@@ -101,7 +104,9 @@
       constructor(x,y,address){
         super();
 
-        //configuration about canvas
+        /*
+         * configuration
+         */
         this.x = x;
         this.y = y;
         this.radius = radiusOfNode;
@@ -117,28 +122,30 @@
         this.network = address;
         this.host = address;
 
-        this.isGateway;
+        this.isGateway = false;
 
-
-
+        /*
+         * define event of object
+         */
         this.addListener('receive_advertisement',(newTable,from,source) => {
           addNewItemToRoutingTable.call(this);
           updateItemInformationInRoutingTable.call(this);
           broadcost.call(this);
 
+
           function addNewItemToRoutingTable(){
             newTable.forEach((newItem,index) => {
               var isNotHaveItem = this.routingTable.every((item,index) => {
-                if(item.address !== newItem.address) return true;
+                if(item.IP !== newItem.IP && newItem.IP !== this.getIP()) return true;
               });
 
               if(isNotHaveItem){
-                var obj = {
+                this.routingTable.push({
+                  IP: newItem.IP,
                   address: newItem.address,
                   linkID: undefined,
-                  hops: 10000,
-                }
-                this.routingTable.push(obj);
+                  hops: 1000,
+                });
               }
             });
 
@@ -148,24 +155,24 @@
             var links = this.links;
 
             this.routingTable.forEach((item,index) => {
-              var newItem = getItemWithAddress(this.routingTable[index].address,newTable);
+              var newItem = getItemWithAddress(this.routingTable[index].IP,newTable);
 
               if(newItem && item.hops > (newItem.hops + 1)){
                 item.hops = newItem.hops + 1;
-                item.linkID = getLinkIdOfFrom();
+                item.linkID = getLinkIdOfFrom.call(this);
               }
             });
 
 
-            function getItemWithAddress(address,table){
+            function getItemWithAddress(IP,table){
               for(var i=0;i<table.length;i++){
-                if(table[i].address == address) return table[i];
+                if(table[i].IP == IP) return table[i];
               }
             }
 
             function getLinkIdOfFrom(){
-              for(var i=0;i<links.length;i++){
-                if(from === links[i]){
+              for(var i=0;i<this.links.length;i++){
+                if(from === getNodeByID(this.links[i].getAnotherSideID(this)).getIP()){
                   return i;
                 };
               }
@@ -175,23 +182,22 @@
 
           function broadcost(){
             var isSend;
+
             for(var i=0;i<this.routingTable.length;i++){
-              if(this.routingTable[i].address === source){
+              if(this.routingTable [i].IP === source){
                 for(var j=0;j<this.links.length;j++){
-                  if(this.links[j] === from && this.routingTable[i].linkID === j) isSend = true;
+                  if(this.links[j].getAnotherSideID(this) === from && this.routingTable[i].linkID === j){
+                    isSend = true;
+                  }
                 }
-              }}
+              }
+            }
 
 
             if(isSend){
-              this.sendAdvertisement(source,from);
+              this.sendAdvertisement(source,this.getIP());
             }
           }
-
-          function isGateway(node){
-            return node.isGateway;
-          }
-
         });
 
         this.addListener('receive_packet',packet => {
@@ -221,11 +227,39 @@
         return (this.network << 8) + this.host;
       }
 
+      getTextOfIP(){
+        return `${this.network}.${this.host}`
+      }
+
+      getNetwork(){
+        return this.network;
+      }
+
+      getHost(){
+        return this.host;
+      }
+
       //function about IP
       sendAdvertisement(source,from){
+        if(source === undefined) var source = this.getIP();
+
         this.links.forEach((link) => {
-          if(link.getAnotherSideID(this) != from)
-            link.getAnotherSideID(this).emitEvent('receive_advertisement',[this.routingTable,this,source]);
+          var anotherNodeID = link.getAnotherSideID(this);
+
+          if(anotherNodeID !== from){
+            if(getNodeByID(anotherNodeID).isGateway && this.isGateway){
+              var routingTableToSended = [];
+
+              this.routingTable.forEach((item) => {
+                if((item.IP >> 8) != this.getNetwork()) routingTableToSended.push(item);
+              });
+            }else{
+              var routingTableToSended = this.routingTable;
+            }
+
+            getNodeByID(anotherNodeID).emitEvent('receive_advertisement',[routingTableToSended,this.getIP(),source]);
+          }
+
         });
       }
 
@@ -236,68 +270,16 @@
 
         }
       }
-
-      /*connect(node,isIntraAS,link){
-        var index;
-        var notDuplicate = this.routingTable.every((item,i) => {
-          if(item.address !== node.address){
-            return true;
-          }else{
-            index = i;
-            return false;
-          }
-        });
-
-        if(notDuplicate){
-          var newItem = {
-            address: node.address,
-            linkID: this.links.length,
-            hops: 1,
-          }
-          this.routingTable.push(newItem);
-        }else{
-          this.routingTable[index].linkID = this.links.length;
-          this.routingTable[index].hops = 1;
-        }
-
-        if(isIntraAS){
-          if(this.graph < node.graph){
-            node.graph = this.graph;
-          }else{
-            this.graph = node.graph;
-          }
-        }
-
-        this.links.push(link);
-      }*/
-
-      /*  var linkID = getLinkID.call(this);
-
-        if(linkID != undefined){
-          var data = {origin:this,
-            destination:this.links[linkID],
-            address};
-          this.links[linkID].emitEvent('receive_packet',[data,this]);
-
-        }else{
-          console.error('You cannot send packet to yourself!');
-        }
-
-
-        function getLinkID(){
-          var link = this.routingTable.filter((item)=>{
-            if(item.address === address) return true;
-          })[0];
-
-          if(link) return link.linkID;
-          return undefined;
-        }*/
   }
 
   class Packet extends EventEmitter{
       constructor(origin,destination,address){
-        super();
         var distance = Math.sqrt(Math.pow((origin.x - destination.x), 2) + Math.pow((origin.y - destination.y), 2));
+        super();
+
+        /*
+         * configuration
+         */
 
         this.origin = origin;
         this.destination = destination;
@@ -308,12 +290,13 @@
         this.x = origin.x;
         this.y = origin.y;
 
+        /*
+         * define event of object
+         */
         this.addListener('arrive',function arriveListener(){
           this.removeListener('arrive',arriveListener);
           destination.emitEvent('receive_packet',[this]);
         });
-
-        PACKETS.push(this);
       }
 
       move(){
@@ -330,18 +313,29 @@
   }
 
   class Link extends EventEmitter{
-      constructor(origin,destination,isIntraAS){
-        super();
-        this.packets = [];
+      constructor(origin,destination,config){
+        var {isCrossNetwork,color} = config;
 
+        super();
+
+        /*
+         * configuration
+         */
+        this.packets = [];
         this.lside = origin.ID;
         this.rside = destination.ID;
+        this.color = color;
+
+        if(!isCrossNetwork) updateNetworkNumber();
 
         LINKS.push(this);
 
         origin.emitEvent('create_new_link',[this]);
         destination.emitEvent('create_new_link',[this]);
 
+        /*
+         * define event of object
+         */
         this.addListener('receive_packet_from_node',(from,address) => {
           var packet;
           var origin = getNodeByID(this.lside);
@@ -352,6 +346,14 @@
 
           this.packets.push(packet);
         });
+
+        function updateNetworkNumber(){
+          if(origin.network < destination.network)
+            destination.network = origin.network;
+          else
+            origin.network = destination.network;
+        }
+
       }
 
       transfer(){
@@ -364,8 +366,22 @@
         if(from.ID === this.lside) return this.rside;
         return this.lside;
       }
+
+      getPackets(){
+        return this.packets;
+      }
   }
 
+  /*
+   * basic function
+   */
+  function getNodeByID(ID){
+    return NODES[ID];
+  }
+
+  /*
+   * init and loop function
+   */
   function calculus(){
     LINKS.forEach(link => {
       link.transfer();
@@ -391,7 +407,7 @@
     function renderNodes(){
       for(var i=0;i<NODES.length;i++){
         ctx.fillStyle  = '#ffffff';
-        ctx.fillText(`${NODES[i].network}.${NODES[i].network}`,NODES[i].x,NODES[i].y,20)
+        ctx.fillText(`${NODES[i].network}.${NODES[i].host}`,NODES[i].x,NODES[i].y,20)
         ctx.fillStyle  = NODES[i].color;
         ctx.beginPath();
         ctx.arc(NODES[i].x, NODES[i].y, NODES[i].radius, 0, 2 * Math.PI);
@@ -404,7 +420,7 @@
         var lside = getNodeByID(LINKS[i].lside);
         var rside = getNodeByID(LINKS[i].rside);
 
-        ctx.strokeStyle = edgeColor;
+        ctx.strokeStyle = LINKS[i].color;
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(lside.x,lside.y);
@@ -414,20 +430,19 @@
     }
 
     function renderPackets(){
-      for(var i=0;i<PACKETS.length;i++){
-        ctx.fillStyle  = packetColor;
-        ctx.beginPath();
-        ctx.arc(PACKETS[i].x, PACKETS[i].y, 4, 0, 2 * Math.PI);
-        ctx.fill();
+      ctx.fillStyle  = packetColor;
+
+      for(var i=0;i<LINKS.length;i++){
+        LINKS[i].getPackets().forEach(item => {
+          ctx.beginPath();
+          ctx.arc(item.x, item.y, 4, 0, 2 * Math.PI);
+          ctx.fill();
+        });
       }
     }
   }
 
-  function getNodeByID(ID){
-    return NODES[ID];
-  }
-
-  window.onresize = function () {
+  window.onresize = function init() {
     canvasEl.width = document.body.clientWidth;
     canvasEl.height = canvasEl.clientHeight;
 
@@ -438,6 +453,9 @@
     generateNode();
     generateNetwork();
     generateGateway();
+    connectNetwork();
+    generateRoutingTable();
+
 
     function generateNode(){
       for (var i = 0; i < numberOfNode; i++) {
@@ -464,14 +482,15 @@
 
             var distance = Math.sqrt(Math.pow((node1.x - node2.x), 2) + Math.pow((node1.y - node2.y), 2));
 
-            if(distance < 500 && node2.links.length === 0){
-              new Link(node1,node2,true);
+            if(distance < lengthOfLink && node2.links.length === 0){
+              new Link(node1,node2,{
+                color: edgeColor
+              });
             }
           }
         }
       }
 
-      //或许我需要写一个DFS算法来获取局域网内所有节点
       function createNetwork(){
         for(var i=0;i<NODES.length;i++){
           let tem = [];
@@ -481,7 +500,7 @@
 
           if(tem.length !== 0) NETWORKS.push({
             nodes : tem,
-            graphp : i
+            network : i
           });
         }
       }
@@ -495,15 +514,33 @@
       }
     }
 
-    function connectAS(){
-      for(var i=0;i<AS.length-1;i++){
-        new Link(AS[i].gateway,AS[i+1].gateway,false);
-      }
+    function connectNetwork(){
+      for(var i=0;i<NETWORKS.length-1;i++)
+        new Link(NETWORKS[i].gateway,NETWORKS[i+1].gateway,{
+          isCrossNetwork: true,
+          color: '#f90403'
+        });
     }
 
-    /*NODES.forEach(function(node){
-      node.sendAdvertisement(node.address);
-    });*/
+    function generateRoutingTable(){
+      //为何要循环三次？？？这里似乎有个bug(只循环一次路由表项目缺失)，我还没有修复
+      NODES.forEach(function(node){
+        node.sendAdvertisement();
+      });
+      NODES.forEach(function(node){
+        node.sendAdvertisement();
+      });
+      NODES.forEach(function(node){
+        node.sendAdvertisement();
+      });
+      NODES.forEach(function(node){
+        node.sendAdvertisement();
+      });
+      NODES.forEach(function(node){
+        node.sendAdvertisement();
+      });
+    }
+
     render();
   };
 
