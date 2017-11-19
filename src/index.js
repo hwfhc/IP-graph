@@ -2,7 +2,15 @@
  * dependency modules
  */
 
-const nodeManager = require('./nodeManager');
+const physics = require('./physics');
+
+const getNodeByID = physics.getNodeByID;
+const addNode = physics.addNode;
+const getAllNode = physics.getAllNode;
+const addLink = physics.addLink;
+const getAllLink = physics.getAllLink;
+
+
 const EventEmitter = require('wolfy87-eventemitter');
 const Node = require('./node');
 const Link = require('./link');
@@ -30,12 +38,14 @@ const locationRuleOfNode = function(x,y){
        }*/
 }
 
-var NETWORKS = [];
+const NETWORKS = [];
 
 /*
  * init and loop function
  */
 function calculus(){
+    var LINKS = getAllLink();
+
     LINKS.forEach(link => {
         link.transfer();
     });
@@ -46,8 +56,8 @@ function calculus(){
 }
 
 function render() {
-    var NODES = nodeManager.getAllNode();
-    var LINKS = nodeManager.getAllLink();
+    var NODES = getAllNode();
+    var LINKS = getAllLink();
 
     renderBackground();
     renderNodes();
@@ -101,10 +111,6 @@ window.onresize = function init() {
     canvasEl.width = document.body.clientWidth;
     canvasEl.height = canvasEl.clientHeight;
 
-    NODES = [];
-    LINKS = [];
-    PACKETS = [];
-
     generateNode();
     generateNetwork();
     generateGateway();
@@ -118,7 +124,7 @@ window.onresize = function init() {
             var y = Math.random() * canvasEl.height;
 
             if(locationRuleOfNode(x,y)){
-                nodeManager.addNode(new Node(x,y,i));
+                addNode(new Node(x,y,i));
             }else{
                 i--;
             }
@@ -126,6 +132,8 @@ window.onresize = function init() {
     }
 
     function generateNetwork(){
+        var NODES = getAllNode();
+
         createLinkOfNodes();
         createNetwork();
 
@@ -138,7 +146,7 @@ window.onresize = function init() {
                     var distance = Math.sqrt(Math.pow((node1.x - node2.x), 2) + Math.pow((node1.y - node2.y), 2));
 
                     if(distance < lengthOfLink && node2.links.length === 0){
-                        nodeManager.addLink(new Link(node1,node2,{
+                        addLink(new Link(node1,node2,{
                             color: edgeColor
                         }));
                     }
@@ -171,7 +179,7 @@ window.onresize = function init() {
 
     function connectNetwork(){
         for(var i=0;i<NETWORKS.length-1;i++)
-            nodeManager.addLink(new Link(NETWORKS[i].gateway,NETWORKS[i+1].gateway,{
+            addLink(new Link(NETWORKS[i].gateway,NETWORKS[i+1].gateway,{
                 isCrossNetwork: true,
                 color: '#f90403'
             }));
@@ -180,7 +188,7 @@ window.onresize = function init() {
     function generateRoutingTable(){
         //为何要循环三次？？？这里似乎有个bug(只循环一次路由表项目缺失)，我还没有修复
 
-        var NODES = nodeManager.getAllNode();
+        var NODES = getAllNode();
         NODES.forEach(function(node){
             node.sendAdvertisement();
         });
@@ -211,8 +219,5 @@ window.requestAnimationFrame(calculus);
       NODES[origin].send(destination);
     }
   },250);*/
-nodeManager.getNodeByID(0).send(1);
-console.log(NODES);
-console.log(LINKS);
-console.log(NETWORKS);
+getNodeByID(0).send(1);
 

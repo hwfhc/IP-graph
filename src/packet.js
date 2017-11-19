@@ -30,7 +30,7 @@ class Packet extends EventEmitter{
     move(){
         var distance = Math.sqrt(Math.pow((this.x - this.destination.x), 2) + Math.pow((this.y - this.destination.y), 2));
 
-        if(distance > radiusOfNode){
+        if(distance > this.radius){
             this.x += packetSpeed * this.cos;
             this.y += packetSpeed * this.sin;
         }else{

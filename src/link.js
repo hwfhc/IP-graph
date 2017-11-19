@@ -1,5 +1,9 @@
 const Packet = require('./packet');
 const EventEmitter = require('wolfy87-eventemitter');
+const physics = require('./physics');
+
+const getNodeByID = physics.getNodeByID;
+
 
 class Link extends EventEmitter{
     constructor(origin,destination,config){

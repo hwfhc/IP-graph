@@ -1,5 +1,7 @@
 const EventEmitter = require('wolfy87-eventemitter');
-const nodeManager = require('./nodeManager');
+const physics = require('./physics');
+
+const getNodeByID = physics.getNodeByID;
 
 const nodeColor = '#0a32c8';
 const radiusOfNode = 3;
@@ -75,7 +77,7 @@ class Node extends EventEmitter{
 
                 function getLinkIdOfFrom(){
                     for(var i=0;i<this.links.length;i++){
-                        if(from === nodeManager.getNodeByID(this.links[i].getAnotherSideID(this)).getIP()){
+                        if(from === getNodeByID(this.links[i].getAnotherSideID(this)).getIP()){
                             return i;
                         };
                     }
@@ -104,15 +106,13 @@ class Node extends EventEmitter{
         });
 
         this.addListener('receive_packet',packet => {
-            var index = PACKETS.indexOf(packet);
-            PACKETS.splice(index, 1);
             if(this.address !== packet.address) this.send(packet.address);
         });
 
         this.addListener('create_new_link',link => {
             this.links.push(link);
 
-            var node = nodeManager.getNodeByID(link.getAnotherSideID(this));
+            var node = getNodeByID(link.getAnotherSideID(this));
             var IP = node.getIP();
             var textOfIP = `${node.network}.${node.host}`;
 
@@ -129,7 +129,7 @@ class Node extends EventEmitter{
     getIP(){
         return (this.network << 8) + this.host;
     }
-getTextOfIP(){ return `${this.network}.${this.host}`
+    getTextOfIP(){ return `${this.network}.${this.host}`
     }
 
     getNetwork(){
@@ -148,7 +148,7 @@ getTextOfIP(){ return `${this.network}.${this.host}`
             var anotherNodeID = link.getAnotherSideID(this);
 
             if(anotherNodeID !== from){
-                if(nodeManager.getNodeByID(anotherNodeID).isGateway && this.isGateway){
+                if(getNodeByID(anotherNodeID).isGateway && this.isGateway){
                     var routingTableToSended = [];
 
                     this.routingTable.forEach((item) => {
@@ -158,14 +158,14 @@ getTextOfIP(){ return `${this.network}.${this.host}`
                     var routingTableToSended = this.routingTable;
                 }
 
-                nodeManager.getNodeByID(anotherNodeID).emitEvent('receive_advertisement',[routingTableToSended,this.getIP(),source]);
+                getNodeByID(anotherNodeID).emitEvent('receive_advertisement',[routingTableToSended,this.getIP(),source]);
             }
 
         });
     }
 
     send(address){
-//        this.links[2].emitEvent('receive_packet_from_node',[this,address]);
+        this.links[2].emitEvent('receive_packet_from_node',[this,address]);
 
         function Routing(){
 
