@@ -15,6 +15,9 @@ class Packet extends EventEmitter{
         this.cos = (destination.x - origin.x) / distance;
         this.address = address;
 
+        this.radius = 3;
+        this.packetSpeed = 6;
+
         this.x = origin.x;
         this.y = origin.y;
 
@@ -31,8 +34,8 @@ class Packet extends EventEmitter{
         var distance = Math.sqrt(Math.pow((this.x - this.destination.x), 2) + Math.pow((this.y - this.destination.y), 2));
 
         if(distance > this.radius){
-            this.x += packetSpeed * this.cos;
-            this.y += packetSpeed * this.sin;
+            this.x += this.packetSpeed * this.cos;
+            this.y += this.packetSpeed * this.sin;
         }else{
             this.emitEvent('arrive');
         }

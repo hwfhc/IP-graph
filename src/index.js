@@ -24,7 +24,6 @@ const ctx = canvasEl.getContext('2d');
 const backgroundColor = '#000';
 const edgeColor = '#0527af';
 const packetColor = '#2f5af0';
-const packetSpeed = 6;
 const lengthOfLink = 250;
 const numberOfNode = 60;
 
