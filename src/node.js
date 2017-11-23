@@ -49,7 +49,7 @@ class Node extends EventEmitter{
                             IP: newItem.IP,
                             address: newItem.address,
                             linkID: undefined,
-                            hops: 1000,
+                            hops: 1000
                         });
                     }
                 });
@@ -164,13 +164,33 @@ class Node extends EventEmitter{
         });
     }
 
-    send(address){
-        this.links[2].emitEvent('receive_packet_from_node',[this,address]);
+    send(desIP){
+        var routingTable = this.routingTable;
 
-        function Routing(){
+        routingTable.forEach((item) => {
 
-        }
+            if(item.IP == desIP){
+               this.links[item.linkID].emitEvent('receive_packet_from_node',[this,desIP]);
+                return;
+            }
+        });
+
+        routingTable.forEach((item) => {
+            if(getNetwork(item.IP) === getNetwork(desIP) &&
+            getNetwork(item.IP) !== this.getNetwork){
+                console.log(getNetwork(item.IP));
+                console.log(getNetwork(desIP) );
+
+                this.links[item.linkID].emitEvent('receive_packet_from_node',[this,desIP]);
+                return;
+            }
+        });
+
     }
+}
+
+function getNetwork(IP){
+    return IP >> 8;
 }
 
 module.exports = Node;

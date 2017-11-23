@@ -218,5 +218,5 @@ window.requestAnimationFrame(calculus);
       NODES[origin].send(destination);
     }
   },250);*/
-getNodeByID(0).send(1);
+getNodeByID(0).send(50);
 

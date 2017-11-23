@@ -33,8 +33,8 @@ class Link extends EventEmitter{
             var origin = getNodeByID(this.lside);
             var destination = getNodeByID(this.rside);
 
-            if(from == origin) packet = new Packet(origin,destination,address);
-            packet = new Packet(destination,origin,address);
+            if(from === origin) packet = new Packet(origin,destination,address);
+            else packet = new Packet(destination,origin,address);
 
             this.packets.push(packet);
         });
